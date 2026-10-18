@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "acsf-usd-env"
+description = "Read-only exporter from ACSF runs to OpenUSD stages"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+dependencies = ["usd-core==26.8"]
+dynamic = ["version"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=9.1", "mypy>=2.4", "ruff>=0.17"]
+
+[project.scripts]
+acsf-usd = "acsf_usd.cli:main"
+
+[project.urls]
+Repository = "https://github.com/Preponderous-Software/acsf-usd-env"
+
+[tool.setuptools.dynamic]
+version = { attr = "acsf_usd.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["acsf_usd*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+files = ["acsf_usd", "tests"]
+
+[[tool.mypy.overrides]]
+# usd-core ships no type information; pxr is typed as Any.
+module = ["pxr", "pxr.*"]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
