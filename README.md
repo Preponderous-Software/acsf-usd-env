@@ -49,6 +49,16 @@ that contradicts `--binary` is a usage error. `--time-codes-per-second N` sets t
 rate (default one cycle per second) and `--source-commit SHA` records the ACSF commit a run was
 produced with.
 
+```bash
+acsf-usd validate echo.usda ~/.consciousness/Echo    # exit 0 when the stage matches the journal
+acsf-usd describe Echo                               # what an export would contain; writes nothing
+```
+
+`validate` re-reads a stage (`.usda`, `.usdc`, or a multi-instance root) and checks it against
+the same input(s). Every journaled thought, reflection, perception and reply must be held
+byte-for-byte at its cycle, every other cycle must hold an empty string, and
+`acsf:cycleIndexing` must match. Any mismatch is reported by cycle, and the exit status is 1.
+
 The USD time code is the ACSF thought cycle: scrubbing to frame *n* shows what ACSF journaled
 for cycle *n*. Prim paths and attributes are listed in
 [ARCHITECTURE.md § ACSF → USD mapping](./ARCHITECTURE.md#acsf--usd-mapping).

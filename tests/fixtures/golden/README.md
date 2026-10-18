@@ -15,3 +15,9 @@ the originals and must not be edited: tests compare exports against them, and th
 | Directory | Events at 64486d9 |
 |---|---|
 | `Echo/` | 200 `thought`, 67 `perception`, 34 `reflection` |
+| `Rafael/` | 83 `thought`, 13 `reflection` |
+| `Sage/` | 76 `thought`, 25 `perception`, 9 `reflection` |
+| `Wren/` | 200 `thought`, 66 `perception`, 23 `reflection` |
+
+None of the four journals has `cycle` events (they predate ACSF #196), so all are indexed by
+counting thoughts (`acsf:cycleIndexing = "counted"`).

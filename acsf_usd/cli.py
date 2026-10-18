@@ -14,6 +14,7 @@ from acsf_usd.model import InstanceRun
 from acsf_usd.reader import InputError, read_instance, resolve_inputs
 from acsf_usd.stage.build import ExportOptions, build_instance_stage, write_stage
 from acsf_usd.stage.compose import export_composed
+from acsf_usd.validate import format_report, validate
 
 log = logging.getLogger("acsf_usd")
 
@@ -76,6 +77,25 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SHA",
         help="ACSF commit the run was produced with; recorded as acsf:sourceCommit",
     )
+    check = commands.add_parser(
+        "validate",
+        help="check a stage against its source journal(s)",
+        description=(
+            "Re-read a stage written by `acsf-usd export` and check it against the same "
+            "input(s): every journaled thought, reflection, perception and utterance must be "
+            "held byte-for-byte at its cycle, other cycles must hold an empty string, and "
+            "acsf:cycleIndexing must match. Exits 1 on any mismatch. Reads .usda and .usdc."
+        ),
+    )
+    check.add_argument("stage", type=Path, help="stage file (.usda or .usdc; a root layer)")
+    check.add_argument("inputs", nargs="+", metavar="source", help="the input(s) it came from")
+
+    describe = commands.add_parser(
+        "describe",
+        help="summarise ACSF input(s) without writing anything",
+        description="Print what an export of the input(s) would contain. Writes nothing.",
+    )
+    describe.add_argument("inputs", nargs="+", metavar="input", help="as for export")
     return parser
 
 
@@ -148,20 +168,64 @@ def run_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_validate(args: argparse.Namespace) -> int:
+    directories, _ = resolve_inputs(args.inputs)
+    runs = [read_instance(directory) for directory in directories]
+    reports = validate(args.stage, runs)
+    for report in reports:
+        for line in format_report(report):
+            print(line)
+    failed = sum(1 for report in reports if report.problems)
+    if failed:
+        print(f"validate: FAIL — {failed} of {len(reports)} instance(s) differ from the journal")
+        return 1
+    print(f"validate: OK — {len(reports)} instance(s) match their journals")
+    return 0
+
+
+def run_describe(args: argparse.Namespace) -> int:
+    directories, _ = resolve_inputs(args.inputs)
+    for directory in directories:
+        run = read_instance(directory)
+        counts: dict[str, int] = {}
+        for indexed in run.journal.events:
+            counts[indexed.event.type] = counts.get(indexed.event.type, 0) + 1
+        mood = any(
+            i.event.cycle is not None and i.event.cycle.mood is not None for i in run.journal.events
+        )
+        print(f"{directory}: {describe_run(run)}")
+        print("  events: " + ", ".join(f"{n} {t}" for t, n in sorted(counts.items())))
+        print(f"  mood: {'journaled per cycle' if mood else 'final value only'}")
+        print(f"  snapshot: {'state.json' if run.snapshot is not None else 'none'}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command is None:
         parser.print_help()
         return 0
-    logging.basicConfig(level=logging.WARNING, format="acsf-usd: warning: %(message)s")
+    # Warnings go to the stderr of this invocation (not a process-wide basicConfig).
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("acsf-usd: warning: %(message)s"))
+    log.addHandler(handler)
+    log.setLevel(logging.WARNING)
+    log.propagate = False
     try:
         if args.command == "export":
             return run_export(args)
+        if args.command == "validate":
+            return run_validate(args)
+        if args.command == "describe":
+            return run_describe(args)
     except UsageError as exc:
         parser.exit(2, f"acsf-usd: error: {exc}\n")
     except (InputError, OSError) as exc:
         print(f"acsf-usd: error: {exc}", file=sys.stderr)
         return 1
+    finally:
+        log.removeHandler(handler)
+        log.propagate = True
     parser.error(f"unknown command {args.command}")
     return 2
