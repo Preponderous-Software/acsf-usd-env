@@ -37,7 +37,16 @@ def test_geometry_prims_and_types(nova: Usd.Stage) -> None:
     assert nova.GetPrimAtPath(f"{NOVA}/Interlocutors/Dana/Cube").GetTypeName() == "Cube"
     assert nova.GetPrimAtPath(f"{NOVA}/Interlocutors/Robin/Cube").GetTypeName() == "Cube"
     assert nova.GetRootLayer().customLayerData["acsf:layout:synthetic"] is True
-    assert "Synthetic" in nova.GetPrimAtPath(f"{NOVA}/Stimulus").GetDocumentation()
+    # doc metadata is not inherited: every geometry prim and its parent carry the label.
+    for path in (
+        "Stimulus",
+        "Stimulus/Sphere",
+        "Interlocutors/Dana",
+        "Interlocutors/Dana/Cube",
+        "Interlocutors/Robin",
+        "Interlocutors/Robin/Cube",
+    ):
+        assert "Synthetic" in nova.GetPrimAtPath(f"{NOVA}/{path}").GetDocumentation(), path
 
 
 def test_stimulus_visible_exactly_on_perception_cycles(nova: Usd.Stage) -> None:
