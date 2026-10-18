@@ -9,7 +9,7 @@ A standalone, read-only exporter that turns a run of the [Artificial Consciousne
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** — components, data flow, the ACSF → USD mapping table, dependencies, testing strategy, open questions
 - **[ACSF](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework)** — the framework whose runs this tool reads
 
-The exporter reads ACSF's on-disk artifacts (`journal.jsonl`, `state.json`) and never writes to an instance directory. The reverse direction — an ACSF instance perceiving a USD scene — needs a small change inside ACSF and is written up as a proposal, not built here (see [ARCHITECTURE.md § Direction of sync](./ARCHITECTURE.md#direction-of-sync)).
+The exporter reads ACSF's on-disk artifacts (`journal.jsonl`, `state.json`) and never writes to an instance directory. The reverse direction — an ACSF instance perceiving a USD scene — needs a small change inside ACSF and is written up as a proposal, not built here: [docs/usd-perception-proposal.md](./docs/usd-perception-proposal.md) (see also [ARCHITECTURE.md § Direction of sync](./ARCHITECTURE.md#direction-of-sync)).
 
 This is research tooling, not production infrastructure. Like ACSF itself, it avoids claims beyond observable functional behaviour: a prim named after an instance is a visualisation of logged events, not a representation of a mind.
 

@@ -61,7 +61,8 @@ ACSF extension would be
    and passing through ACSF's existing perception sanitisation.
 
 That is still text perception of a static scene — not embodiment, and it would not by itself
-advance AE-2. Milestone 8 writes this up as a proposal document in this repository for the
+advance AE-2. Milestone 8 writes this up as a proposal document in this repository
+([docs/usd-perception-proposal.md](./docs/usd-perception-proposal.md)) for the
 ACSF maintainers to accept or reject; nothing is filed or changed in ACSF by this project.
 
 ## Components
@@ -315,4 +316,5 @@ on 2026-10-17 and moved to [Decisions](#decisions).
 2. **Workspace history.** The short-term buffer is only available as a final snapshot;
    reconstructing it per cycle from the journal would be an approximation. Worth it?
 3. **Import direction.** Does the ACSF side want a USD-scene perception provider at all? The
-   design note (milestone 8) is the input to that decision.
+   design note ([docs/usd-perception-proposal.md](./docs/usd-perception-proposal.md), milestone 8)
+   is the input to that decision.
