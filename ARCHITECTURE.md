@@ -37,14 +37,15 @@ Reasons, each checked against ACSF's code:
 5. **Zero risk to instance data.** A read-only reader cannot corrupt a running instance's
    state. The exporter opens ACSF files read-only and writes only to its own output path.
 
-The cost: export lags a live run by however often it is re-run, and per-cycle mood history
-is unavailable because ACSF does not journal it (see [Open questions](#open-questions)).
+The cost: a batch export lags a live run by however often it is re-run (`--follow` narrows
+that to one poll interval, see [Live mode](#live-mode-follow)), and per-cycle mood history is
+available only from journals in which ACSF records it (see [Decisions](#decisions)).
 
 ## Direction of sync
 
 | Direction | MVP | Notes |
 |---|---|---|
-| **ACSF → USD** (export, playback) | **Yes** | Batch export of a finished or running instance; re-runnable. |
+| **ACSF → USD** (export, playback) | **Yes** | Batch export of a finished or running instance; re-runnable. `--follow` keeps one instance's stage current as cycles happen (milestone 9). |
 | **USD → ACSF** (load environment) | **No — design note only** | Needs an ACSF change; see below. |
 
 **Why import is not in the MVP.** "Loading an ACSF environment from USD" has nothing to load
@@ -70,7 +71,8 @@ acsf_usd/
   reader/       ACSF artifact readers (journal.jsonl, state.json), typed records, cycle indexer
   model.py      In-memory run model: Instance, Cycle, Event, Snapshot
   stage/        USD writers: static snapshot, time-sampled channels, schematic layout, composition
-  cli.py        `acsf-usd export | validate | describe`
+  follow.py     `--follow`: poll journal.jsonl from a byte offset, re-author the instance layer
+  cli.py        `acsf-usd export [--follow] [--binary] | validate | describe`
 tests/
   fixtures/     Small synthetic journals + states; golden-run copies pinned to an ACSF SHA
 ```
@@ -84,7 +86,8 @@ tests/
 | `stage.channels` | Author time-sampled string/float/token attributes per event channel. |
 | `stage.layout` | Author the schematic geometry and per-cycle visibility. |
 | `stage.compose` | One layer per instance; a root layer that sublayers them for multi-instance views. |
-| `cli` | Resolve input (instance name under `CONSCIOUSNESS_HOME`, an instance dir, a run dir, or a `CONSCIOUSNESS_HOME`), write `.usda`/`.usdc`, validate. |
+| `follow` | Live mode for one instance: incremental, read-only journal polling; atomic re-write of the output layer (see [Live mode](#live-mode-follow)). |
+| `cli` | Resolve input (instance name under `CONSCIOUSNESS_HOME`, an instance dir, a run dir, or a `CONSCIOUSNESS_HOME`), write `.usda` (default) or `.usdc` (`--binary`), validate. |
 
 ### Cycle indexing rules
 
@@ -138,15 +141,16 @@ Stage metadata: `defaultPrim = "World"`, `upAxis = "Y"`, `metersPerUnit = 1`,
 | Stage root | `/World` | `Xform` | — | — |
 | Instance (directory name) | `/World/Instances/<name>` | `Xform` | `acsf:name` (string) | no |
 | `state.json identity.{origin_story, purpose, self_concept, values, personality_traits, amendments}` | `/World/Instances/<name>/Identity` | typeless | `acsf:identity:*` (string / string[]) | no (snapshot) |
-| `state.json identity.mood.<dim>` / `initial_mood.<dim>` | `/World/Instances/<name>/Mood` | typeless | `acsf:mood:<dim>`, `acsf:moodBaseline:<dim>` (float) | **no** — final value only; ACSF does not journal mood |
+| `cycle.mood.<dim>` when present ([ACSF #220](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/issues/220)); otherwise `state.json identity.mood.<dim>` | `/World/Instances/<name>/Mood` | typeless | `acsf:mood:<dim>` (float) | yes when `cycle` events carry `mood`; otherwise **no** — final value only |
+| `state.json identity.initial_mood.<dim>` | same | — | `acsf:moodBaseline:<dim>` (float) | no (snapshot) |
 | `cycle.attention.{focus, theme, salience}` (fallback: `state.json identity.attention_schema`) | `/World/Instances/<name>/Attention` | typeless | `acsf:focus` (token), `acsf:theme` (string), `acsf:salience` (float) | yes (when `cycle` events exist) |
-| `cycle.{metacognitive_label, prediction.error, reflection.effective, reflection.fired, short_term_size}` | `/World/Instances/<name>/Cycle` | typeless | `acsf:hot2Label` (token), `acsf:predictionError` (float), `acsf:reflectionP` (float), `acsf:reflectionFired` (bool), `acsf:workspaceSize` (int) | yes |
+| `cycle.{metacognitive_label, prediction.error, reflection.effective, reflection.fired, short_term_size}`, `len(cycle.retrieved)` | `/World/Instances/<name>/Cycle` | typeless | `acsf:hot2Label` (token), `acsf:predictionError` (float), `acsf:reflectionP` (float), `acsf:reflectionFired` (bool), `acsf:workspaceSize` (int), `acsf:retrievedCount` (int; count only, never the summaries) | yes |
 | `thought` event | `/World/Instances/<name>/Stream` | typeless | `acsf:thought` (string) | yes (held) |
 | `reflection` event | same | — | `acsf:reflection` (string; empty when none this cycle) | yes |
 | `perception` event (incl. `speech`) | `/World/Instances/<name>/Stimulus` | `Xform` + child `Sphere` | `acsf:perception` (string), `acsf:perceptionSource` (token: `wikipedia`/`mock`/`speech`), `visibility` | yes |
 | `utterance` event (`to`, `in_reply_to`) | `/World/Instances/<name>/Interlocutors/<sender>` | `Xform` + child `Cube` | `acsf:utterance`, `acsf:inReplyTo` (string), `visibility` | yes |
 | `identity_shift` event | `/World/Instances/<name>/Identity` | — | `acsf:selfConcept` (string) | yes |
-| `memory` / `consolidation` events | `/World/Instances/<name>/Memory` | typeless | `acsf:longTermCount` (int), `acsf:consolidation` (string) | yes |
+| `memory.long_term_count`, `consolidation.{long_term_total, stored}` | `/World/Instances/<name>/Memory` | typeless | `acsf:longTermCount` (int), `acsf:consolidationStored` (int) — counts only, no memory text | yes |
 | `state.json short_term[]` (`kind`, `content`, `timestamp`, `importance`, `seq`) | `/World/Instances/<name>/Workspace/Item_<seq>` | typeless | `acsf:kind` (token), `acsf:content` (string), `acsf:importance` (float) | no (final snapshot) |
 | journal `timestamp` | `/World/Instances/<name>/Stream` | — | `acsf:timestamp` (string, ISO-8601) | yes |
 | Unknown event type `<t>` | `/World/Instances/<name>/Stream` | — | `acsf:event:<t>` (string, `content`) | yes |
@@ -160,6 +164,31 @@ is visible only on cycles with a perception; each interlocutor cube is placed on
 the instance (angle from a stable hash of the sender name) and visible on cycles with an
 utterance to it. Multiple instances are offset along X. These positions encode nothing ACSF
 knows and must never be read as such.
+
+## Live mode (follow)
+
+`acsf-usd export <instance> -o <file> --follow` exports the journal as it stands, then keeps
+the output current as the instance runs. It follows **one** instance; multi-instance
+composition stays batch-only.
+
+- **Polling, like ACSF's own tailer.** Every 0.5 s (configurable) the size of
+  `journal.jsonl` is compared with a byte offset; new bytes are read from a handle opened
+  `"rb"`. Only complete lines are consumed — a partial trailing line waits for the next poll —
+  and a file that shrank is re-read from offset 0. This mirrors the dashboard tailer
+  ([`interfaces/web/journal_tail.py` L9–L10, L107–L164](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/blob/64486d9c580325df33f03e8cb20dc7b8a227189a/consciousness-sim/interfaces/web/journal_tail.py#L107-L164)),
+  so no file-watching dependency is added.
+- **Appending time samples.** New events go through the same cycle indexer as a batch
+  export and extend the in-memory run model. USD layers are not appended in place, so the
+  instance layer is re-authored from the model and written to a temporary file next to the
+  output, then moved over it with `os.replace` — a USD tool never sees a half-written file.
+  `state.json` is re-read on each write; if it is missing or unparseable at that moment (it
+  is overwritten on every save), the previous snapshot is kept.
+- **Strictly read-only.** Instance files are only ever opened for reading; no lock, sidecar,
+  offset file or temporary file is created in the instance directory, and an output path
+  inside any input directory is refused. Offsets live in memory only.
+- **Same result as batch.** On SIGINT/SIGTERM a final write is made and the command exits
+  0. The final output is byte-identical to a batch export of the same journal bytes and
+  `state.json`, so `validate` and the determinism check apply unchanged.
 
 ## Dependencies
 
@@ -188,22 +217,51 @@ knows and must never be read as such.
 - **Read-only guarantee:** the export test snapshots the input directory's file hashes and
   mtimes before and after and asserts no change.
 - **Determinism:** exporting the same input twice produces byte-identical `.usda`.
+- **Follow mode:** a test appends journal lines (including one line flushed in two writes)
+  to a temporary instance while `--follow` runs, asserts the output gains samples, and asserts
+  the final output equals a batch export of the same files; the instance directory gains no
+  files other than the test's own writes.
 - **CI:** GitHub Actions, Python 3.11 and 3.13, `pytest`, `mypy`, `ruff`. No network; no LLM.
+
+## Decisions
+
+Recorded 2026-10-17. Each entry resolves a question that was previously listed under
+[Open questions](#open-questions).
+
+1. **Mood history: time samples when ACSF journals mood, final value otherwise.** An
+   upstream issue proposes adding the current `mood` to ACSF's per-cycle `cycle` event
+   ([ACSF #220](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/issues/220)). The exporter does not depend on it: when `cycle` events carry
+   `mood`, each `acsf:mood:<dim>` gets one time sample per such cycle and the stage
+   `customData` records `acsf:moodSampling = "journaled"` plus `acsf:moodFirstCycle` (the
+   first cycle that carried it, since journals written before the change have none). When no
+   `cycle` event carries `mood` — every journal written today, including the golden runs —
+   mood is authored as the single final value from `state.json` and
+   `acsf:moodSampling = "final"`. Nothing in this repository changes ACSF.
+2. **Live mode: `acsf-usd export --follow`, added to the MVP as milestone 9.** It stays in
+   the MVP because it is small and adds no new trust boundary: it reuses the readers,
+   indexer and stage writers of milestones 2–4, uses stdlib polling (no new dependency) and
+   follows one instance only. Details in [Live mode](#live-mode-follow). It is strictly
+   read-only against the instance directory.
+3. **Long-term memory: counts only.** Per-cycle counts come from the journal — `memory`
+   events' `long_term_count` and `consolidation` events' `long_term_total` / `stored` — and
+   the number of memories retrieved in a cycle is `len(cycle.retrieved)`. No memory text is
+   written to any USD file: not the `cycle.retrieved[].summary` strings, not `memory.db`
+   rows. `memory.db` is never opened.
+4. **Output format: `.usda` by default, `--binary` for `.usdc`.** Text is the default
+   because it is diffable and is what the determinism and fidelity checks compare.
+   `--binary` writes `.usdc` (USD's binary crate format) for long runs. The flag, not the
+   `-o` extension, selects the format; an `-o` path whose extension contradicts it is a
+   usage error. In multi-instance export the per-instance layers and the root layer all use
+   the selected format. `acsf-usd validate` reads either.
 
 ## Open questions
 
-1. **Mood history.** ACSF journals no mood per cycle; the dashboard reads it from the
-   `state.json` snapshot. Should a one-field upstream addition (`mood` in the `cycle` event's
-   extras) be proposed so mood can be time-sampled, or is final-mood-only acceptable?
-2. **Live mode.** Is batch re-export enough, or is an incremental "tail and append time
-   samples" mode wanted (cf. ACSF's `interfaces/web/journal_tail.py`)?
-3. **Timeline unit.** Cycle index (default) vs. wall-clock seconds since first event — offer
+The questions on mood history, live mode, long-term memory and output format were resolved
+on 2026-10-17 and moved to [Decisions](#decisions).
+
+1. **Timeline unit.** Cycle index (default) vs. wall-clock seconds since first event — offer
    both, or keep wall-clock as data only?
-4. **Long-term memory.** Include a count/summary of `memory.db` rows (read-only SQLite), or
-   leave long-term memory out entirely?
-5. **Workspace history.** The short-term buffer is only available as a final snapshot;
+2. **Workspace history.** The short-term buffer is only available as a final snapshot;
    reconstructing it per cycle from the journal would be an approximation. Worth it?
-6. **Import direction.** Does the ACSF side want a USD-scene perception provider at all? The
+3. **Import direction.** Does the ACSF side want a USD-scene perception provider at all? The
    design note (milestone 8) is the input to that decision.
-7. **Output format.** `.usda` (diffable text) by default and `.usdc` on request, or the reverse
-   for long runs?

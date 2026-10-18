@@ -44,8 +44,10 @@ A background consolidator writes `consolidation` events on its own timer. `state
 whole-state **snapshot** (identity incl. mood and attention schema, short-term buffer,
 `thought_count`, `health`), overwritten on save
 ([L801–L808](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/blob/64486d9c580325df33f03e8cb20dc7b8a227189a/consciousness-sim/core/consciousness.py#L801-L808)).
-Mood is **not** journaled per cycle, so its history is not recoverable from a run — only
-its latest value. That gap is called out in [ARCHITECTURE.md](./ARCHITECTURE.md#open-questions).
+Mood is **not** journaled per cycle at this commit, so its history is not recoverable from a
+run — only its latest value. An upstream issue proposes adding it to the `cycle` event
+([ACSF #220](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/issues/220)); the exporter uses it when present and falls back to the final value
+otherwise ([ARCHITECTURE.md § Decisions](./ARCHITECTURE.md#decisions)).
 
 ## Problem
 
@@ -98,9 +100,10 @@ ACSF run onto it gives a run a durable, tool-agnostic playback format without in
   import direction is a written proposal only.
 - **No writing to instance directories.** The exporter never modifies `journal.jsonl`,
   `state.json`, `memory.db` or any other file under `CONSCIOUSNESS_HOME`.
-- **Not a dashboard replacement.** Live viewing stays with ACSF's web dashboard.
-- **No long-term memory vectors in the stage.** `memory.db` embeddings (thousands of
-  dimensions per row) are out of scope.
+- **Not a dashboard replacement.** Live viewing stays with ACSF's web dashboard;
+  `--follow` only keeps a stage file current for USD tools.
+- **No long-term memory contents in the stage.** Neither `memory.db` embeddings (thousands of
+  dimensions per row) nor memory text; long-term memory appears as counts only.
 
 ## Prior art
 
