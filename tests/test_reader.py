@@ -239,7 +239,11 @@ def test_thought_after_a_thought_less_cycle_starts_a_new_cycle() -> None:
 
 def test_streamed_and_in_memory_parsing_agree() -> None:
     path = INSTANCES / "Nova" / "journal.jsonl"
-    assert read_journal(path) == parse_journal_bytes(path.read_bytes())
+    assert read_journal(path).events == parse_journal_bytes(path.read_bytes()).events
+    assert (
+        read_journal(path).warnings
+        == parse_journal_bytes(path.read_bytes(), label=str(path)).warnings
+    )
 
 
 def test_background_consolidation_attaches_to_latest_cycle_or_first() -> None:

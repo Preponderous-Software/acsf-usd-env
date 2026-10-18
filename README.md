@@ -30,13 +30,21 @@ The only runtime dependency is [`usd-core`](https://pypi.org/project/usd-core/),
 ```bash
 acsf-usd export ~/.consciousness/Echo -o echo.usda   # an instance directory
 acsf-usd export Echo                                 # an instance name under $CONSCIOUSNESS_HOME
-acsf-usd export path/to/run-dir --binary             # binary Echo.usdc instead of text .usda
+acsf-usd export path/to/run-dir --binary             # binary <name>.usdc instead of text .usda
+acsf-usd export Echo Wren -o compare.usda            # two instances on one shared timeline
+acsf-usd export ~/.consciousness                     # every instance: run.usda + one layer each
 ```
 
-The input may be an instance directory, an experiment run directory or a golden-run
-directory, or an instance name under `CONSCIOUSNESS_HOME` (default `~/.consciousness`). It is
-only read: `acsf-usd` refuses an output path inside it. Without `-o`, the output is
-`<name>.usda` (or `<name>.usdc` with `--binary`) in the current directory; an `-o` extension
+An input may be an instance directory, an experiment run directory or a golden-run directory,
+an instance name under `CONSCIOUSNESS_HOME` (default `~/.consciousness`), or a directory of
+instance directories (a whole `CONSCIOUSNESS_HOME`, or an experiment run with `replicate-<i>/`
+subdirectories). Inputs are only read: `acsf-usd` refuses an output path inside any of them.
+Several instances are written as one layer each plus a root layer that sublayers them and
+offsets each instance along X (see
+[ARCHITECTURE.md § Multi-instance composition](./ARCHITECTURE.md#multi-instance-composition)).
+Without `-o`, the output of a single-instance export is
+`<name>.usda` (or `<name>.usdc` with `--binary`) in the current directory, and of a
+multi-instance export `run.usda` (`run.usdc`); an `-o` extension
 that contradicts `--binary` is a usage error. `--time-codes-per-second N` sets the playback
 rate (default one cycle per second) and `--source-commit SHA` records the ACSF commit a run was
 produced with.

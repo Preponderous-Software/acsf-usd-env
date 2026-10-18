@@ -1,10 +1,12 @@
-"""Resolve an ``acsf-usd`` input argument to an ACSF instance directory and read it.
+"""Resolve ``acsf-usd`` input arguments to ACSF instance directories and read them.
 
 An input is an instance directory, an experiment run directory or a golden-run directory
 (each holds ``journal.jsonl`` and/or ``state.json``), or the name of an instance under
 ``CONSCIOUSNESS_HOME`` (default ``~/.consciousness``), resolved as ACSF's experiment runner
 resolves ``resume_from`` (``experiments/runner.py`` at 64486d9): an existing directory wins
-over a name. Nothing is ever written to the resolved directory.
+over a name. A directory holding neither file but containing instance directories — a whole
+``CONSCIOUSNESS_HOME``, or an experiment run with ``replicate-<i>/`` subdirectories — is a
+*collection* and stands for all of them. Nothing is ever written to a resolved directory.
 """
 
 from __future__ import annotations
@@ -54,6 +56,39 @@ def resolve_instance_dir(arg: str, home: Path | None = None) -> Path:
         f"{arg}: not a directory, and no instance named {arg!r} under {root} "
         f"(set CONSCIOUSNESS_HOME to change where instances are looked up)"
     )
+
+
+def instance_children(path: Path) -> list[Path]:
+    """Instance directories directly inside ``path``, sorted by name."""
+    return sorted((child for child in path.iterdir() if is_instance_dir(child)), key=str)
+
+
+def resolve_inputs(args: list[str], home: Path | None = None) -> tuple[list[Path], bool]:
+    """Resolve every argument; return the instance directories and whether any argument was a
+    collection (so the export is multi-instance even when it yields one instance)."""
+    directories: list[Path] = []
+    collection = False
+    for arg in args:
+        candidate = Path(arg)
+        if candidate.is_dir() and not is_instance_dir(candidate):
+            children = instance_children(candidate)
+            if not children:
+                raise InputError(
+                    f"{arg}: directory has neither {JOURNAL} nor {STATE}, "
+                    "and no instance directories inside it"
+                )
+            directories.extend(children)
+            collection = True
+        else:
+            directories.append(resolve_instance_dir(arg, home))
+    seen: set[Path] = set()
+    unique: list[Path] = []
+    for directory in directories:
+        key = directory.resolve()
+        if key not in seen:
+            seen.add(key)
+            unique.append(directory)
+    return unique, collection
 
 
 def read_instance(directory: Path, name: str | None = None) -> InstanceRun:

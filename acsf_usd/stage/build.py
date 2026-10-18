@@ -24,8 +24,14 @@ class ExportOptions:
     source_commit: str | None = None
 
 
-def build_instance_stage(run: InstanceRun, options: ExportOptions | None = None) -> Usd.Stage:
-    """Author one instance into a new in-memory stage."""
+def build_instance_stage(
+    run: InstanceRun, options: ExportOptions | None = None, prim: str | None = None
+) -> Usd.Stage:
+    """Author one instance into a new in-memory stage.
+
+    ``prim`` overrides the instance prim name (multi-instance export disambiguates names);
+    ``acsf:name`` always keeps the run's own name.
+    """
     options = options or ExportOptions()
     stage = Usd.Stage.CreateInMemory()
     world = UsdGeom.Xform.Define(stage, WORLD)
@@ -34,7 +40,7 @@ def build_instance_stage(run: InstanceRun, options: ExportOptions | None = None)
     UsdGeom.SetStageMetersPerUnit(stage, 1.0)
     UsdGeom.Xform.Define(stage, INSTANCES)
 
-    path = instance_path(run.name)
+    path = instance_path(prim if prim is not None else run.name)
     instance = UsdGeom.Xform.Define(stage, path).GetPrim()
     set_attr(instance, "acsf:name", Sdf.ValueTypeNames.String, run.name)
     # One mood-dimension naming for the snapshot and the journaled samples.
