@@ -98,6 +98,8 @@ metrics already use.
    cycle: the preceding `perception` and `thought` and the following `utterance`,
    `reflection`, `identity_shift` and `memory` events (write order in
    [`core/consciousness.py` L956–L1011](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/blob/64486d9c580325df33f03e8cb20dc7b8a227189a/consciousness-sim/core/consciousness.py#L956-L1011)).
+   In a journal that has `cycle` events, a cycle without one (for example a stretch written
+   before #196) is numbered one past the previous cycle.
 2. Journals without `cycle` events (written before #196 — e.g. the committed golden runs,
    which contain only `thought`, `perception` and `reflection`) fall back to counting
    `thought` events: a `perception` belongs to the next `thought`; everything after a
@@ -105,7 +107,8 @@ metrics already use.
    `thought_count` but write no `thought`, so in this mode indices can undercount; the stage
    records `acsf:cycleIndexing = "counted"` vs `"journaled"`.
 3. `consolidation` events come from a background timer, not a cycle; they are attached to
-   the most recent cycle and flagged `background`.
+   the most recent cycle and flagged `background` (to the first cycle if none has completed
+   yet; to cycle 0 in a journal with no cycles at all).
 4. Wall-clock `timestamp` strings are kept as a time-sampled attribute, not used as time codes.
 
 ## Data flow

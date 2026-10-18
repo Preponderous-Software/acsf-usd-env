@@ -1,0 +1,15 @@
+{
+  "identity": {
+    "name": "Lumen",
+    "mood": {
+      "curiosity": 0.73,
+      "wonder": 0.58
+    },
+    "initial_mood": {
+      "curiosity": 0.7,
+      "wonder": 0.6
+    }
+  },
+  "short_term": [],
+  "thought_count": 3
+}

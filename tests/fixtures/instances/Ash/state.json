@@ -1,0 +1,26 @@
+{
+  "identity": {
+    "name": "Ash",
+    "mood": {
+      "curiosity": 0.4
+    },
+    "initial_mood": {
+      "curiosity": 0.5
+    },
+    "attention_schema": {
+      "focus": "memory",
+      "theme": "",
+      "salience": 0.3,
+      "history": []
+    }
+  },
+  "short_term": [
+    {
+      "kind": "thought",
+      "content": "Ash three.",
+      "timestamp": "2026-10-17T12:00:05.000000+00:00",
+      "importance": 1.0
+    }
+  ],
+  "thought_count": 3
+}

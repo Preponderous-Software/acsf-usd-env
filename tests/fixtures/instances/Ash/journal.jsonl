@@ -1,0 +1,6 @@
+{"timestamp": "2026-10-17T12:00:01.000000+00:00", "type": "thought", "content": "Ash one."}
+{"timestamp": "2026-10-17T12:00:02.000000+00:00", "type": "reflection", "content": "Ash reflects on one."}
+{"timestamp": "2026-10-17T12:00:03.000000+00:00", "type": "perception", "content": "[mock: Lighthouse] A lighthouse is a tower."}
+{"timestamp": "2026-10-17T12:00:04.000000+00:00", "type": "thought", "content": "Ash two."}
+{"timestamp": "2026-10-17T12:00:05.000000+00:00", "type": "thought", "content": "Ash three."}
+{"timestamp": "2026-10-17T12:00:06.000000+00:00", "type": "reflection", "content": "Ash reflects on three."}
