@@ -45,6 +45,19 @@ The USD time code is the ACSF thought cycle: scrubbing to frame *n* shows what A
 for cycle *n*. Prim paths and attributes are listed in
 [ARCHITECTURE.md § ACSF → USD mapping](./ARCHITECTURE.md#acsf--usd-mapping).
 
+### What the geometry means — and does not
+
+ACSF has no spatial world, so a stage has no real geometry to show. To make it viewable in an
+ordinary USD tool, the exporter adds a **schematic, synthetic** layout: a sphere above each
+instance's origin that is visible only on cycles with a perception, and one cube per person
+the instance replied to, on a ring around the origin, visible only on cycles with a reply to
+that person. The geometry shows *when* something was journaled — nothing else. The sphere's
+height, the ring, a cube's angle (a hash of the person's name) and the X offset between
+instances are arbitrary drawing choices: they are not positions, distances or directions
+ACSF knows, the instance has no body or location, and nothing in the stage feeds back into
+ACSF. Every stage records `acsf:layout:synthetic = true`, and each geometry prim's
+documentation says the same.
+
 ## Development
 
 ```bash

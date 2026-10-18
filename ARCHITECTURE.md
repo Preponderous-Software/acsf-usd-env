@@ -183,10 +183,13 @@ the next sample (verified with `usd-core` 26.8: a string sampled at t=0 and t=1 
 the t=1 value at t=1.5). Floats are authored at integer time codes only.
 
 **Schematic layout (synthetic).** The instance sits at its own origin; the `Stimulus` sphere
-is visible only on cycles with a perception; each interlocutor cube is placed on a ring around
-the instance (angle from a stable hash of the sender name) and visible on cycles with an
-utterance to it. Multiple instances are offset along X. These positions encode nothing ACSF
-knows and must never be read as such.
+(radius 0.4, 1.5 units above the origin) is visible (`visibility = inherited`) only on cycles
+with a perception and `invisible` on every other cycle; each interlocutor cube (size 0.5) is
+placed on a ring of radius 3 in the XZ plane around the instance — the angle comes from the
+SHA-256 of the sender name, and coordinates are rounded to 6 decimals so they are identical
+across runs and machines — and is visible on cycles with an utterance to it. Every geometry
+prim carries `doc` metadata saying it is synthetic. Multiple instances are offset along X.
+These positions encode nothing ACSF knows and must never be read as such.
 
 ## Live mode (follow)
 
