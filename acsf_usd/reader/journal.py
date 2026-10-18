@@ -30,13 +30,16 @@ class JournalParse:
 
 
 def read_journal(path: Path) -> JournalParse:
-    """Read a whole journal. A missing file is an empty journal."""
+    """Stream a whole journal line by line. A missing file is an empty journal."""
+    events: list[Event] = []
+    warnings: list[str] = []
     try:
         with path.open("rb") as handle:
-            data = handle.read()
+            for line_no, raw in enumerate(handle, start=1):
+                _accept(raw, line_no, events, warnings)
     except FileNotFoundError:
         return JournalParse((), ())
-    return parse_journal_bytes(data)
+    return JournalParse(tuple(events), tuple(warnings))
 
 
 def split_lines(data: bytes) -> list[bytes]:
@@ -48,17 +51,21 @@ def split_lines(data: bytes) -> list[bytes]:
 
 
 def parse_journal_bytes(data: bytes, first_line_no: int = 1) -> JournalParse:
+    """Parse journal bytes already in memory (follow mode reads appended chunks)."""
     events: list[Event] = []
     warnings: list[str] = []
     for offset, raw in enumerate(split_lines(data)):
-        line_no = first_line_no + offset
-        event, warning = parse_line(raw, line_no)
-        if warning is not None:
-            log.warning("%s", warning)
-            warnings.append(warning)
-        if event is not None:
-            events.append(event)
+        _accept(raw, first_line_no + offset, events, warnings)
     return JournalParse(tuple(events), tuple(warnings))
+
+
+def _accept(raw: bytes, line_no: int, events: list[Event], warnings: list[str]) -> None:
+    event, warning = parse_line(raw, line_no)
+    if warning is not None:
+        log.warning("%s", warning)
+        warnings.append(warning)
+    if event is not None:
+        events.append(event)
 
 
 def parse_line(raw: bytes, line_no: int) -> tuple[Event | None, str | None]:

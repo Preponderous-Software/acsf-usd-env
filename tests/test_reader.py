@@ -210,6 +210,38 @@ def test_journaled_mode_numbers_groups_without_cycle_events_after_the_previous_o
     ]
 
 
+def test_cycle_trace_whose_thought_line_was_lost_still_bounds_its_cycle() -> None:
+    # The thought of cycle 2 was corrupt and skipped: its trace must not merge into cycle 1.
+    events = _events(
+        _line("thought", "1"),
+        _line("cycle", "c1", thought_count=1),
+        _line("cycle", "c2", thought_count=2),
+        _line("memory", "m2", long_term_count=1),
+        _line("consolidation", "after a thought-less cycle"),
+    )
+    assert _cycle_map(events) == [
+        ("thought", 1, False),
+        ("cycle", 1, False),
+        ("cycle", 2, False),
+        ("memory", 2, False),
+        ("consolidation", 2, True),
+    ]
+
+
+def test_thought_after_a_thought_less_cycle_starts_a_new_cycle() -> None:
+    events = _events(
+        _line("cycle", "c1", thought_count=1),
+        _line("thought", "2"),
+        _line("cycle", "c2", thought_count=2),
+    )
+    assert _cycle_map(events) == [("cycle", 1, False), ("thought", 2, False), ("cycle", 2, False)]
+
+
+def test_streamed_and_in_memory_parsing_agree() -> None:
+    path = INSTANCES / "Nova" / "journal.jsonl"
+    assert read_journal(path) == parse_journal_bytes(path.read_bytes())
+
+
 def test_background_consolidation_attaches_to_latest_cycle_or_first() -> None:
     events = _events(
         _line("consolidation", "early"),

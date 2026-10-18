@@ -14,7 +14,9 @@ indexing rules):
    recent cycle and flagged ``background``.
 
 Events are grouped by journal write order. A group starts at a ``perception`` or ``thought``
-once the current group already has its ``thought``; any other event joins the current group.
+once the current group already has its ``thought`` or its ``cycle`` trace, and at a ``cycle``
+trace once the current group already has one (so a corrupt, skipped ``thought`` line never
+merges two journaled cycles); any other event joins the current group.
 In a journal that has ``cycle`` events, a group without one (for example a stretch written
 before ACSF #196) is numbered one past the previous group.
 """
@@ -45,28 +47,34 @@ def index_events(events: Sequence[Event]) -> IndexedJournal:
         "journaled" if any(e.type == "cycle" and e.cycle is not None for e in events) else "counted"
     )
     groups: list[_Group] = []
-    # Each background event with the index of the group it attaches to (-1: no thought yet).
+    # Each background event with the index of the group it attaches to (-1: no cycle yet).
     background: list[tuple[Event, int]] = []
     # Journal order: ("ev", group index, event) or ("bg", background index, event).
     order: list[tuple[str, int, Event]] = []
     current = _Group()
     groups.append(current)
-    last_with_thought = -1
+    # Index of the latest group with a thought or a cycle trace (-1: none yet).
+    last_complete = -1
     for event in events:
         if event.type == "consolidation":
-            background.append((event, last_with_thought))
+            background.append((event, last_complete))
             order.append(("bg", len(background) - 1, event))
             continue
-        if event.type in _GROUP_STARTERS and current.has_thought:
+        is_trace = event.type == "cycle" and event.cycle is not None
+        complete = current.has_thought or current.journaled is not None
+        if (event.type in _GROUP_STARTERS and complete) or (
+            is_trace and current.journaled is not None
+        ):
             current = _Group()
             groups.append(current)
         current.events.append(event)
         order.append(("ev", len(groups) - 1, event))
         if event.type == "thought":
             current.has_thought = True
-            last_with_thought = len(groups) - 1
-        elif event.type == "cycle" and event.cycle is not None and current.journaled is None:
+            last_complete = len(groups) - 1
+        elif is_trace and event.cycle is not None:
             current.journaled = event.cycle.thought_count
+            last_complete = len(groups) - 1
 
     numbers = _number_groups(groups, indexing)
     # Background events seen before any thought attach to the first cycle; a journal with

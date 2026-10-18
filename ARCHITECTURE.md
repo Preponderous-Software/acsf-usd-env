@@ -100,6 +100,8 @@ metrics already use.
    [`core/consciousness.py` L956–L1011](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/blob/64486d9c580325df33f03e8cb20dc7b8a227189a/consciousness-sim/core/consciousness.py#L956-L1011)).
    In a journal that has `cycle` events, a cycle without one (for example a stretch written
    before #196) is numbered one past the previous cycle.
+   A `cycle` event also bounds its cycle on its own, so a corrupt (skipped) `thought` line
+   never merges two journaled cycles.
 2. Journals without `cycle` events (written before #196 — e.g. the committed golden runs,
    which contain only `thought`, `perception` and `reflection`) fall back to counting
    `thought` events: a `perception` belongs to the next `thought`; everything after a
