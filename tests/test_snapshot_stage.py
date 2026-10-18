@@ -115,10 +115,23 @@ def test_missing_state_omits_snapshot_prims_with_warning(
     shutil.copy(INSTANCES / "Nova" / "journal.jsonl", directory / "journal.jsonl")
     with caplog.at_level(logging.WARNING):
         stage = _export(directory, tmp_path)
-    instance = stage.GetPrimAtPath(NOVA)
-    assert instance.IsValid()
-    for child in ("Identity", "Mood", "Attention", "Workspace"):
-        assert not stage.GetPrimAtPath(f"{NOVA}/{child}").IsValid()
+    assert stage.GetPrimAtPath(NOVA).IsValid()
+    assert not stage.GetPrimAtPath(f"{NOVA}/Workspace").IsValid()
+    assert not stage.GetPrimAtPath(f"{NOVA}/Mood").IsValid()
+    # Time-sampled channels (MVP 4) may still define Identity/Attention; no snapshot
+    # attribute is authored on them.
+    snapshot_attrs = [
+        attr.GetName()
+        for prim in stage.Traverse()
+        for attr in prim.GetAttributes()
+        if attr.GetName().startswith(("acsf:identity:", "acsf:moodBaseline:"))
+        or (
+            attr.GetName() in ("acsf:focus", "acsf:theme", "acsf:salience")
+            and attr.HasValue()
+            and not attr.GetTimeSamples()
+        )
+    ]
+    assert snapshot_attrs == []
     assert any("no state.json snapshot" in r.getMessage() for r in caplog.records)
 
 

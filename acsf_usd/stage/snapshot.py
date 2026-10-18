@@ -15,7 +15,12 @@ from acsf_usd.stage.common import set_attr, string_array, unique_names
 T = Sdf.ValueTypeNames
 
 
-def author_snapshot(stage: Usd.Stage, instance: Sdf.Path, snapshot: Snapshot) -> None:
+def author_snapshot(
+    stage: Usd.Stage,
+    instance: Sdf.Path,
+    snapshot: Snapshot,
+    mood_names: dict[str, str] | None = None,
+) -> None:
     identity = stage.DefinePrim(instance.AppendChild("Identity"))
     for attr_name, text in (
         ("acsf:identity:originStory", snapshot.origin_story),
@@ -34,7 +39,7 @@ def author_snapshot(stage: Usd.Stage, instance: Sdf.Path, snapshot: Snapshot) ->
     mood = stage.DefinePrim(instance.AppendChild("Mood"))
     # One mapping for both maps, so a dimension keeps the same name in both attributes and
     # dimensions that sanitise alike (``self-confidence`` / ``self_confidence``) stay distinct.
-    dims = unique_names([*snapshot.mood, *snapshot.initial_mood])
+    dims = mood_names or unique_names([*snapshot.mood, *snapshot.initial_mood])
     for dim, value in sorted(snapshot.mood.items()):
         set_attr(mood, f"acsf:mood:{dims[dim]}", T.Double, value)
     for dim, value in sorted(snapshot.initial_mood.items()):

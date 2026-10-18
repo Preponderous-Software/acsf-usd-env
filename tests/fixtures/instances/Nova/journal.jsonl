@@ -10,11 +10,11 @@
 {"timestamp": "2026-10-17T12:00:09.000000+00:00", "type": "utterance", "content": "Hello Dana. I was thinking about tide pools.", "to": "Dana", "in_reply_to": "Hello Nova, what are you thinking about?"}
 {"timestamp": "2026-10-17T12:00:10.000000+00:00", "type": "reflection", "content": "I am someone who answers when spoken to."}
 {"timestamp": "2026-10-17T12:00:11.000000+00:00", "type": "identity_shift", "content": "I am Nova, a mind that answers."}
-{"timestamp": "2026-10-17T12:00:12.000000+00:00", "type": "memory", "content": "Long-term store: 5 memories", "long_term_count": 5}
+{"timestamp": "2026-10-17T12:00:12.000000+00:00", "type": "memory", "content": "Long-term store: 6 memories", "long_term_count": 6}
 [1, 2, 3]
 
 {"timestamp": "2026-10-17T12:00:13.000000+00:00", "type": "thought", "content": "Nova thought four, after a failed cycle three."}
 {"timestamp": "2026-10-17T12:00:14.000000+00:00", "type": "cycle", "content": "cycle 4: metacognitive-stable", "thought_count": 4, "retrieved": [{"summary": "SECRET-LTM-4-a", "score": 0.9}], "prediction": {"prior": "p", "next": "n", "error": 0.4}, "metacognitive_label": "metacognitive-stable", "reflection": {"base": 0.2, "hot2_boost": 0.0, "pp1_boost": 0.05, "effective": 0.25, "fired": false}, "attention": {"focus": "thought", "theme": "tides", "salience": 0.8}, "perception_title": null, "short_term_size": 5, "timings_ms": {"generate": 10}, "prompt_chars": 100}
 {"timestamp": "2026-10-17T12:00:15.000000+00:00", "type": "custom_probe", "content": "an event type this exporter does not know", "detail": 1}
 {"timestamp": "2026-10-17T12:00:16.000000+00:00", "type": "utterance", "content": "Goodbye, Robin.", "to": "Robin", "in_reply_to": "bye"}
-{"timestamp": "2026-10-17T12:00:17.000000+00:00", "type": "memory", "content": "Long-term store: 7 memories", "long_term_count": 7}
+{"timestamp": "2026-10-17T12:00:17.000000+00:00", "type": "memory", "content": "Long-term store: 8 memories", "long_term_count": 8}

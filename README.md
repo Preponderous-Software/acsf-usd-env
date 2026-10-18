@@ -25,6 +25,26 @@ acsf-usd --version
 
 The only runtime dependency is [`usd-core`](https://pypi.org/project/usd-core/), pinned to `26.8`, which provides the `pxr` Python bindings. It does **not** ship `usdview` or any imaging plugins, so viewing a stage needs a full OpenUSD build or another USD-capable tool.
 
+## Usage
+
+```bash
+acsf-usd export ~/.consciousness/Echo -o echo.usda   # an instance directory
+acsf-usd export Echo                                 # an instance name under $CONSCIOUSNESS_HOME
+acsf-usd export path/to/run-dir --binary             # binary Echo.usdc instead of text .usda
+```
+
+The input may be an instance directory, an experiment run directory or a golden-run
+directory, or an instance name under `CONSCIOUSNESS_HOME` (default `~/.consciousness`). It is
+only read: `acsf-usd` refuses an output path inside it. Without `-o`, the output is
+`<name>.usda` (or `<name>.usdc` with `--binary`) in the current directory; an `-o` extension
+that contradicts `--binary` is a usage error. `--time-codes-per-second N` sets the playback
+rate (default one cycle per second) and `--source-commit SHA` records the ACSF commit a run was
+produced with.
+
+The USD time code is the ACSF thought cycle: scrubbing to frame *n* shows what ACSF journaled
+for cycle *n*. Prim paths and attributes are listed in
+[ARCHITECTURE.md § ACSF → USD mapping](./ARCHITECTURE.md#acsf--usd-mapping).
+
 ## Development
 
 ```bash
