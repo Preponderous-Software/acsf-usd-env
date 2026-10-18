@@ -162,8 +162,9 @@ unrounded.
 | journal `timestamp` | `/World/Instances/<name>/Stream` | — | `acsf:timestamp` (string, ISO-8601) | yes |
 | Unknown event type `<t>` | `/World/Instances/<name>/Stream` | — | `acsf:event:<t>` (string, `content`; `<t>` sanitised and disambiguated like interlocutor names) | yes |
 
-**Sampling rules.** String and token channels (`Stream`, `Stimulus`, `Interlocutors/*`) get
-a sample on every cycle of the timeline — the cycle's value, or `""` when the channel has no
+**Sampling rules.** The timeline is every integer cycle from the first to the last journaled
+one, including failed cycles that journaled nothing. String and token channels (`Stream`,
+`Stimulus`, `Interlocutors/*`) get a sample on every cycle of the timeline — the cycle's value, or `""` when the channel has no
 event that cycle — so a held string never carries over into a later cycle; `Memory`'s
 `acsf:consolidationStored` likewise has a sample (possibly 0) on every cycle. Values that
 describe a state rather than an event (`Cycle`, `Attention`, `Mood` when journaled,

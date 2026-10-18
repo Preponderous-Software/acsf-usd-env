@@ -1,10 +1,11 @@
 """Author the time-sampled event channels of one instance.
 
-USD time code = ACSF cycle number. String/token channels get a sample on **every** cycle of
-the timeline — the cycle's value, or ``""`` when the channel has no event that cycle — so a
-held string never carries over into a later cycle. Numeric channels (``Cycle``,
-``Attention``, ``Memory.acsf:longTermCount``, ``Mood``) are sampled only on cycles whose
-event carries them. Several events of one channel in one cycle are joined with ``"\\n"``.
+USD time code = ACSF cycle number. The timeline is every integer cycle from the first to the
+last journaled one. String/token channels get a sample on **every** cycle of the timeline —
+the cycle's value, or ``""`` when the channel has no event that cycle — so a held string never
+carries over into a later cycle. Numeric channels (``Cycle``, ``Attention``,
+``Memory.acsf:longTermCount``, ``Mood``) are sampled only on cycles whose event carries them.
+Several events of one channel in one cycle are joined with ``"\\n"``.
 
 Long-term memory appears as counts only (ARCHITECTURE.md § Decisions, 3).
 """
@@ -152,6 +153,12 @@ def author_channels(
     mood_names: dict[str, str] | None = None,
 ) -> ChannelSummary:
     cycles = collect(journal.events)
+    # The timeline is every integer cycle from the first to the last, so a cycle without
+    # events (a failed cycle: ACSF increments thought_count but journals nothing) also gets
+    # empty samples instead of showing the previous cycle's held strings.
+    if cycles:
+        for cycle in range(min(cycles), max(cycles) + 1):
+            cycles.setdefault(cycle, CycleData())
     timeline = tuple(sorted(cycles))
     senders = sender_prim_names(s for d in cycles.values() for s in d.utterances)
     summary = ChannelSummary(

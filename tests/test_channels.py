@@ -55,15 +55,18 @@ def test_stream_thought_matches_journal_byte_for_byte(nova: Usd.Stage) -> None:
         if line.startswith('{"')
     ]
     thoughts = [e["content"] for e in journal if e["type"] == "thought"]
-    assert _samples(nova, f"{NOVA}/Stream", "acsf:thought") == dict(
+    samples = _samples(nova, f"{NOVA}/Stream", "acsf:thought")
+    assert {t: v for t, v in samples.items() if v} == dict(
         zip([1.0, 2.0, 4.0], thoughts, strict=True)
     )
+    assert samples[3.0] == ""  # failed cycle 3 journaled no thought
 
 
 def test_reflection_is_empty_on_cycles_without_one(nova: Usd.Stage) -> None:
     assert _samples(nova, f"{NOVA}/Stream", "acsf:reflection") == {
         1.0: "",
         2.0: "I am someone who answers when spoken to.",
+        3.0: "",
         4.0: "",
     }
 
@@ -72,6 +75,7 @@ def test_timestamp_is_the_cycles_thought_time(nova: Usd.Stage) -> None:
     assert _samples(nova, f"{NOVA}/Stream", "acsf:timestamp") == {
         1.0: "2026-10-17T12:00:02.000000+00:00",
         2.0: "2026-10-17T12:00:07.000000+00:00",
+        3.0: "",
         4.0: "2026-10-17T12:00:13.000000+00:00",
     }
 
@@ -82,10 +86,12 @@ def test_stimulus_values_do_not_leak_into_later_cycles(nova: Usd.Stage) -> None:
     assert perception[2.0] == "[speech: Dana says] Hello Nova, what are you thinking about?"
     # Held value between cycles: the cycle-2 value at 3.5 would be wrong; cycle 4 is empty.
     attr = nova.GetPrimAtPath(f"{NOVA}/Stimulus").GetAttribute("acsf:perception")
+    assert attr.Get(3) == "" and attr.Get(3.5) == ""  # failed cycle 3: nothing held over
     assert attr.Get(4.5) == ""
     assert _samples(nova, f"{NOVA}/Stimulus", "acsf:perceptionSource") == {
         1.0: "wikipedia",
         2.0: "speech",
+        3.0: "",
         4.0: "",
     }
     assert nova.GetPrimAtPath(f"{NOVA}/Stimulus").GetTypeName() == "Xform"
@@ -97,6 +103,7 @@ def test_interlocutors_per_recipient(nova: Usd.Stage) -> None:
     assert _samples(nova, dana, "acsf:utterance") == {
         1.0: "",
         2.0: "Hello Dana. I was thinking about tide pools.",
+        3.0: "",
         4.0: "",
     }
     assert _samples(nova, dana, "acsf:inReplyTo")[2.0] == (
@@ -134,7 +141,12 @@ def test_attention_channel_from_cycle_events(nova: Usd.Stage) -> None:
 def test_memory_counts_only(nova: Usd.Stage, tmp_path: Path) -> None:
     memory = f"{NOVA}/Memory"
     assert _samples(nova, memory, "acsf:longTermCount") == {1.0: 6, 2.0: 6, 4.0: 8}
-    assert _samples(nova, memory, "acsf:consolidationStored") == {1.0: 2, 2.0: 0, 4.0: 0}
+    assert _samples(nova, memory, "acsf:consolidationStored") == {
+        1.0: 2,
+        2.0: 0,
+        3.0: 0,
+        4.0: 0,
+    }
     out = tmp_path / "nova.usda"
     write_stage(build_instance_stage(read_instance(INSTANCES / "Nova")), out)
     text = out.read_text(encoding="utf-8")
@@ -152,6 +164,7 @@ def test_unknown_event_type_passthrough(nova: Usd.Stage) -> None:
     assert _samples(nova, f"{NOVA}/Stream", "acsf:event:custom_probe") == {
         1.0: "",
         2.0: "",
+        3.0: "",
         4.0: "an event type this exporter does not know",
     }
 
@@ -279,7 +292,16 @@ def test_export_command_binary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
 
 
 @pytest.mark.parametrize(
-    "args", [["-o", "x.usdc"], ["--binary", "-o", "x.usda"], ["--time-codes-per-second", "0"]]
+    "args",
+    [
+        ["-o", "x.usdc"],
+        ["--binary", "-o", "x.usda"],
+        ["--time-codes-per-second", "0"],
+        ["--time-codes-per-second", "inf"],
+        ["--time-codes-per-second", "1e309"],
+        ["--time-codes-per-second", "nan"],
+        ["--time-codes-per-second", "fast"],
+    ],
 )
 def test_export_usage_errors(
     args: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch

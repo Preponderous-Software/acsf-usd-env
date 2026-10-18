@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import math
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -65,9 +66,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _positive_float(text: str) -> float:
-    value = float(text)
-    if not value > 0:
-        raise argparse.ArgumentTypeError("must be greater than 0")
+    try:
+        value = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"not a number: {text!r}") from None
+    if not (math.isfinite(value) and value > 0):
+        raise argparse.ArgumentTypeError("must be a finite number greater than 0")
     return value
 
 
