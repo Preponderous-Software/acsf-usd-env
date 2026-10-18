@@ -184,8 +184,8 @@ perceives next. That later change is the part AE-2 is about, and it is not propo
    so out-of-process readers such as this exporter can see which prim was perceived? Any
    such change would also change what this repository reads and maps: today a perception
    becomes `acsf:perception` and `acsf:perceptionSource` on the `Stimulus` prim
-   ([ARCHITECTURE.md § ACSF → USD mapping](../ARCHITECTURE.md#acsf--usd-mapping)), and
-   `usd` would join that attribute's token values.
+   ([ARCHITECTURE.md § ACSF → USD mapping](../ARCHITECTURE.md#acsf--usd-mapping)). Even
+   without new fields, a `usd` perception would add `usd` to that attribute's token values.
 8. **Memory-path defence.** Stored perception text is replayed unsanitised into later
    prompts for every source, Wikipedia included
    ([Prompt-injection handling](#prompt-injection-handling)). Sanitising inside the provider
