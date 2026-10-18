@@ -12,6 +12,7 @@ from acsf_usd import __version__
 from acsf_usd.model import InstanceRun
 from acsf_usd.stage.channels import ChannelSummary, author_channels, journaled_mood_dims
 from acsf_usd.stage.common import INSTANCES, WORLD, instance_path, set_attr, unique_names
+from acsf_usd.stage.layout import author_layout
 from acsf_usd.stage.snapshot import author_snapshot
 
 log = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ def build_instance_stage(run: InstanceRun, options: ExportOptions | None = None)
             "%s: no state.json snapshot; Identity/Mood/Attention/Workspace omitted", run.name
         )
     summary = author_channels(stage, path, run.journal, mood_names)
+    author_layout(stage, path, summary)
 
     stage.SetStartTimeCode(summary.first_cycle)
     stage.SetEndTimeCode(summary.last_cycle)
