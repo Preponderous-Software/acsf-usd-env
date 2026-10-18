@@ -2,7 +2,7 @@
 
 A standalone, read-only exporter that turns a run of the [Artificial Consciousness Simulation Framework](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework) (ACSF) into an [OpenUSD](https://openusd.org) stage — each instance as a prim, its perceptions, thoughts, reflections and replies as time-sampled attributes indexed by thought cycle — so a run can be inspected and scrubbed through in any USD tool. ACSF has no spatial world, so the stage's layout is a **schematic, explicitly synthetic** one; nothing in it claims the agent has a body or a position.
 
-**Status: in development.** The MVP is being implemented milestone by milestone (the `mvp`-labelled issues); until the last one lands, parts of what the design documents describe do not exist yet.
+**Status: MVP complete.** All nine MVP milestones are implemented: batch export of one or several instances, `--follow` live mode, `validate` and `describe`, plus the design note for the import direction. The tool reads ACSF's file formats at commit `64486d9`; it is research tooling, version 0.1.0, with no stability guarantee for its prim and attribute names yet.
 
 - **[CONCEPT.md](./CONCEPT.md)** — the problem, who it is for, what ACSF's "environment" actually is, non-goals, prior art
 - **[MVP.md](./MVP.md)** — the smallest end-to-end slice, acceptance criteria, and the milestone list (one GitHub issue each)
@@ -101,4 +101,4 @@ CI runs the same commands on Python 3.11 and 3.13. Tests use no network and no L
 
 ## License
 
-MIT — see [LICENSE](./LICENSE). The planned runtime dependency `usd-core` is distributed under its own license (the Tomorrow Open Source Technology License 1.0; see [ARCHITECTURE.md § Dependencies](./ARCHITECTURE.md#dependencies)).
+MIT — see [LICENSE](./LICENSE). The runtime dependency `usd-core` is distributed under its own license (the Tomorrow Open Source Technology License 1.0; see [ARCHITECTURE.md § Dependencies](./ARCHITECTURE.md#dependencies)).
