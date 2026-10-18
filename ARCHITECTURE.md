@@ -239,8 +239,14 @@ composition stays batch-only.
   offset file or temporary file is created in the instance directory, and an output path
   inside any input directory is refused. Offsets live in memory only.
 - **Same result as batch.** On SIGINT/SIGTERM a final write is made and the command exits
-  0. The final output is byte-identical to a batch export of the same journal bytes and
-  `state.json`, so `validate` and the determinism check apply unchanged.
+  0. That final poll also consumes a trailing line that has no newline yet, exactly as a batch
+  read does. The final output is therefore byte-identical to a batch export of the same
+  journal bytes and `state.json`, so `validate` and the determinism check apply unchanged.
+  The one exception is a `state.json` that is unparseable at the moment of stopping: follow
+  mode keeps the previous snapshot, while a batch export would have none.
+- **Limits.** Like the dashboard tailer, a journal that is truncated and then regrows past
+  the old offset between two polls is not detected as a rewrite. Only one instance can be
+  followed; several inputs or a collection with `--follow` is a usage error.
 
 ## Dependencies
 

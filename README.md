@@ -2,7 +2,7 @@
 
 A standalone, read-only exporter that turns a run of the [Artificial Consciousness Simulation Framework](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework) (ACSF) into an [OpenUSD](https://openusd.org) stage — each instance as a prim, its perceptions, thoughts, reflections and replies as time-sampled attributes indexed by thought cycle — so a run can be inspected and scrubbed through in any USD tool. ACSF has no spatial world, so the stage's layout is a **schematic, explicitly synthetic** one; nothing in it claims the agent has a body or a position.
 
-**Status: in development.** The MVP is being implemented milestone by milestone (the `mvp`-labelled issues); until the last one lands, parts of what the design documents describe do not exist yet.
+**Status: MVP complete.** All nine MVP milestones are implemented: batch export of one or several instances, `--follow` live mode, `validate` and `describe`, plus the design note for the import direction. The tool reads ACSF's file formats at commit `64486d9`; it is research tooling, version 0.1.0, with no stability guarantee for its prim and attribute names yet.
 
 - **[CONCEPT.md](./CONCEPT.md)** — the problem, who it is for, what ACSF's "environment" actually is, non-goals, prior art
 - **[MVP.md](./MVP.md)** — the smallest end-to-end slice, acceptance criteria, and the milestone list (one GitHub issue each)
@@ -50,6 +50,19 @@ rate (default one cycle per second) and `--source-commit SHA` records the ACSF c
 produced with.
 
 ```bash
+acsf-usd export ~/.consciousness/Echo -o echo.usda --follow   # keep echo.usda current; Ctrl-C to stop
+```
+
+`--follow` keeps one running instance's stage current. It polls `journal.jsonl` every
+`--poll-interval` seconds (default 0.5) and consumes only complete lines. Each update
+re-authors the stage and replaces the output atomically, so a USD tool never sees a
+half-written file. The instance directory is only read; nothing is created in it. On Ctrl-C
+or SIGTERM it makes a final write and exits 0. That final file is byte-identical to a batch
+export of the same `journal.jsonl` and `state.json` (see
+[ARCHITECTURE.md § Live mode](./ARCHITECTURE.md#live-mode-follow)). USD tools that cache
+layers may need to reload the file to see updates.
+
+```bash
 acsf-usd validate echo.usda ~/.consciousness/Echo    # exit 0 when the stage matches the journal
 acsf-usd describe Echo                               # what an export would contain; writes nothing
 ```
@@ -88,4 +101,4 @@ CI runs the same commands on Python 3.11 and 3.13. Tests use no network and no L
 
 ## License
 
-MIT — see [LICENSE](./LICENSE). The planned runtime dependency `usd-core` is distributed under its own license (the Tomorrow Open Source Technology License 1.0; see [ARCHITECTURE.md § Dependencies](./ARCHITECTURE.md#dependencies)).
+MIT — see [LICENSE](./LICENSE). The runtime dependency `usd-core` is distributed under its own license (the Tomorrow Open Source Technology License 1.0; see [ARCHITECTURE.md § Dependencies](./ARCHITECTURE.md#dependencies)).
