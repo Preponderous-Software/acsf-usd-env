@@ -6,7 +6,9 @@
 > golden run). Get a `.usda` file that opens in any OpenUSD tool, whose timeline runs from the
 > first to the last thought cycle, and in which scrubbing to cycle *n* shows exactly the
 > perception, thought, reflection and reply ACSF journaled for cycle *n* — next to the
-> instance's identity, final mood and workspace. The input directory is never modified.
+> instance's identity, mood (per cycle where ACSF journals it, otherwise final) and workspace.
+> With `--follow`, the file keeps up with a running instance. The input directory is never
+> modified.
 
 Direction: **ACSF → USD only.** The USD → ACSF direction ends the MVP as a written proposal
 (milestone 8), because it requires an ACSF change (see
@@ -17,9 +19,13 @@ Direction: **ACSF → USD only.** The USD → ACSF direction ends the MVP as a w
 - Reading `journal.jsonl` and `state.json` from: an instance directory, an instance name under
   `CONSCIOUSNESS_HOME`, an experiment run directory, a golden-run directory.
 - Cycle indexing with both the `cycle`-event rule and the counted fallback.
-- Static snapshot prims (identity, final mood, attention schema, workspace).
+- Static snapshot prims (identity, mood baseline, attention schema, workspace); mood as
+  time samples when `cycle` events carry it, final value otherwise.
 - Time-sampled channels for every journal event type ACSF writes today, plus a passthrough for
   unknown types.
+- Long-term memory as per-cycle counts only.
+- `.usda` output by default, `.usdc` with `--binary`.
+- `--follow`: one instance's stage kept current by polling its journal, read-only.
 - A schematic, explicitly synthetic layout so the stage is viewable as geometry.
 - Multi-instance export: one layer per instance, one root stage sublayering them.
 - `acsf-usd validate` that re-reads a stage and checks it against its source journal.
@@ -27,11 +33,13 @@ Direction: **ACSF → USD only.** The USD → ACSF direction ends the MVP as a w
 
 ## Out of scope
 
-- Any change to ACSF, any issue or PR on the ACSF repository.
+- Any change to ACSF. (One upstream issue, [ACSF #220](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/issues/220), proposes journaling mood
+  per cycle; the MVP does not depend on it.)
 - Physics, rendering, sensors, robots, Omniverse/Isaac Sim integration.
-- Live/incremental export (batch re-export only).
-- Per-cycle mood or per-cycle workspace history (ACSF does not journal them).
-- Long-term memory (`memory.db`) contents and embeddings.
+- Following several instances at once (`--follow` takes one instance).
+- Per-cycle workspace history (ACSF does not journal it).
+- Long-term memory text and embeddings (`memory.db` rows, `cycle.retrieved` summaries).
+  Counts only.
 - A viewer. Any USD viewer is used; `usdview` is not shipped by `usd-core`.
 
 ## Acceptance criteria (MVP as a whole)
@@ -53,6 +61,12 @@ Direction: **ACSF → USD only.** The USD → ACSF direction ends the MVP as a w
 9. The stage carries `acsf:layout:synthetic = true` and the README states what the geometry
    does and does not mean.
 10. CI runs `pytest`, `mypy` (strict) and `ruff` green on Python 3.11 with no network access.
+11. `acsf-usd export --follow` on an instance whose journal is being appended to adds time
+    samples as complete lines arrive, creates nothing in the instance directory, and on exit
+    leaves a file byte-identical to a batch export of the same input.
+12. Without flags the output is `.usda`; `--binary` produces `.usdc` that opens with
+    `Usd.Stage.Open` and passes `acsf-usd validate`.
+13. No USD file contains long-term memory text; long-term memory appears only as counts.
 
 ## Milestones
 
@@ -71,16 +85,18 @@ instance dir / name / run dir.
 cycle; files are opened read-only.
 
 ### 3. Static snapshot stage
-Write `/World`, `/World/Instances/<name>` with `Identity`, `Mood`, `Attention`, `Workspace`
-prims from `state.json`; stage metadata (`defaultPrim`, `upAxis`, `metersPerUnit`, `customData`).
+Write `/World`, `/World/Instances/<name>` with `Identity`, `Mood` (final value; per-cycle
+samples come in milestone 4), `Attention`, `Workspace` prims from `state.json`; stage metadata
+(`defaultPrim`, `upAxis`, `metersPerUnit`, `customData`).
 *Done when:* a stage built from a fixture `state.json` opens and every mapped field from the
 [mapping table](./ARCHITECTURE.md#acsf--usd-mapping) is present with the right type.
 
 ### 4. Time-sampled event channels
-`Stream`, `Stimulus`, `Interlocutors`, `Cycle`, `Memory`, `Identity.selfConcept` channels with
-samples at cycle indices; `startTimeCode`/`endTimeCode`/`timeCodesPerSecond`; unknown-type
-passthrough; the `export` command.
-*Done when:* acceptance criteria 2–4 pass on fixtures.
+`Stream`, `Stimulus`, `Interlocutors`, `Cycle`, `Memory` (counts only), `Identity.selfConcept`
+channels with samples at cycle indices; `Mood` samples when `cycle` events carry `mood`;
+`startTimeCode`/`endTimeCode`/`timeCodesPerSecond`; unknown-type passthrough; the `export`
+command with `.usda` default and `--binary`.
+*Done when:* acceptance criteria 2–4, 12 and 13 pass on fixtures.
 
 ### 5. Schematic layout (synthetic geometry)
 `Sphere` stimulus and ring-placed `Cube` interlocutors with time-sampled `visibility`;
@@ -103,3 +119,11 @@ attribution; read-only and determinism tests.
 `UsdScenePerception`), what it would and would not mean for AE-2, prompt-injection handling,
 and the open questions. No code, no change to ACSF.
 *Done when:* the note is merged and every ACSF claim in it cites a file at a pinned SHA.
+
+### 9. Live mode: follow a running instance
+`acsf-usd export <instance> -o <file> --follow`: poll `journal.jsonl` from a byte offset
+(complete lines only), extend the run model through the milestone 2 indexer, re-author the
+instance layer and atomically replace the output; single instance; strictly read-only
+against the instance directory. Design:
+[ARCHITECTURE.md § Live mode](./ARCHITECTURE.md#live-mode-follow).
+*Done when:* acceptance criterion 11 passes in CI.
