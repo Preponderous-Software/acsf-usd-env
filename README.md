@@ -6,6 +6,10 @@ A standalone, read-only exporter that turns a run of the [Artificial Consciousne
 
 *What the four bundled ACSF golden runs journaled at each thought cycle, read back with usd-core from `acsf-usd export` stages ([`scripts/timeline.py`](./scripts/timeline.py)); a record of logged events, not of a mind, a body or a place.*
 
+![Animated render of the Echo and Wren golden-run stages in the synthetic schematic layout](./docs/images/golden-stage.gif)
+
+*A USD stage of the Echo and Wren golden runs' journaled events, in acsf-usd-env's synthetic schematic layout, animated over cycles in headless Blender from the stage's own time samples ([`scripts/render_stage.py`](./scripts/render_stage.py)): one node per thought, perception pulses from the `Stimulus` sphere, rings for reflections, a tint for the final mood. The spiral, sizes and colours are drawing choices — synthetic schematic layout, not a body or a place.*
+
 **Status: MVP complete.** All nine MVP milestones are implemented: batch export of one or several instances, `--follow` live mode, `validate` and `describe`, plus the design note for the import direction. The tool reads ACSF's file formats at commit `64486d9`; it is research tooling, version 0.1.0, with no stability guarantee for its prim and attribute names yet.
 
 - **[CONCEPT.md](./CONCEPT.md)** — the problem, who it is for, what ACSF's "environment" actually is, non-goals, prior art
