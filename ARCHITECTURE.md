@@ -312,6 +312,28 @@ Recorded 2026-10-17. Each entry resolves a question that was previously listed u
    usage error. In multi-instance export the per-instance layers and the root layer all use
    the selected format. `acsf-usd validate` reads either.
 
+5. **Shared [usd-recorder](https://github.com/Preponderous-Software/usd-recorder) library:
+   evaluated 2026-10-18, not adopted.** usd-recorder packages the recording patterns of this
+   repository and viron-usd (time code = cycle/tick, string channels that must not leak, atomic
+   follow-mode writes, chunked value clips). viron-usd moved onto it; this exporter does not,
+   for three reasons:
+   - *The stage is built in batch from a complete run model,* re-authored in full on every
+     follow-mode write. usd-recorder's `Recorder` is a per-tick API (`record(tick, …)`); the
+     per-tick machinery it would replace does not exist here.
+   - *Dense string channels are part of this exporter's contract.* Every string/token channel
+     has one sample on every cycle of the timeline (Echo: 200 `acsf:thought` samples), and the
+     tests, `validate` and the golden-run counts assert those sample sets. usd-recorder's event
+     channels resolve to the same value at every cycle but sample sparsely (only around
+     events), so adopting them would change every exported file.
+   - *The one piece that would carry over unchanged is the atomic write* (temporary file next
+     to the output, then `os.replace`, in `follow.write_atomically`): about ten lines. Taking a
+     runtime dependency installed from a git tag for it goes against decision 2's
+     no-new-dependency stance for live mode.
+
+   Revisit if usd-recorder is published to PyPI, or if long runs need chunked value clips
+   (the part of usd-recorder that is not small to re-implement correctly; see its
+   ARCHITECTURE.md § The two value-clip traps).
+
 ## Open questions
 
 The questions on mood history, live mode, long-term memory and output format were resolved
