@@ -20,3 +20,6 @@ def instance_copy(tmp_path: Path) -> Callable[[str], Path]:
         return target
 
     return _copy
+
+
+GOLDEN = FIXTURES / "golden"

@@ -155,12 +155,28 @@ unrounded.
 | `thought` event | `/World/Instances/<name>/Stream` | typeless | `acsf:thought` (string) | yes (held) |
 | `reflection` event | same | — | `acsf:reflection` (string; empty when none this cycle) | yes |
 | `perception` event (incl. `speech`) | `/World/Instances/<name>/Stimulus` | `Xform` + child `Sphere` | `acsf:perception` (string), `acsf:perceptionSource` (token: `wikipedia`/`mock`/`speech`), `visibility` | yes |
-| `utterance` event (`to`, `in_reply_to`) | `/World/Instances/<name>/Interlocutors/<sender>` | `Xform` + child `Cube` | `acsf:utterance`, `acsf:inReplyTo` (string), `visibility` | yes |
+| `utterance` event (`to`, `in_reply_to`) | `/World/Instances/<name>/Interlocutors/<sender>` (`<sender>` = the utterance's `to`, the person whose message was answered) | `Xform` + child `Cube` | `acsf:sender` (string, unaltered name; not sampled), `acsf:utterance`, `acsf:inReplyTo` (string), `visibility` | yes |
 | `identity_shift` event | `/World/Instances/<name>/Identity` | — | `acsf:selfConcept` (string) | yes |
-| `memory.long_term_count`, `consolidation.{long_term_total, stored}` | `/World/Instances/<name>/Memory` | typeless | `acsf:longTermCount` (int), `acsf:consolidationStored` (int) — counts only, no memory text | yes |
+| `memory.long_term_count`, `consolidation.{long_term_total, stored}` | `/World/Instances/<name>/Memory` | typeless | `acsf:longTermCount` (int; the latest `long_term_count` / `long_term_total` in the cycle), `acsf:consolidationStored` (int; stored in that cycle, 0 when none) — counts only, no memory text | yes |
 | `state.json short_term[]` (`kind`, `content`, `timestamp`, `importance`, `seq`) | `/World/Instances/<name>/Workspace/Item_<seq>` (`Item_<position>` for every item when any `seq` is missing or repeated — the golden runs' `state.json` files have none) | typeless | `acsf:kind` (token), `acsf:content` (string), `acsf:importance` (float), `acsf:timestamp` (string) | no (final snapshot) |
 | journal `timestamp` | `/World/Instances/<name>/Stream` | — | `acsf:timestamp` (string, ISO-8601) | yes |
-| Unknown event type `<t>` | `/World/Instances/<name>/Stream` | — | `acsf:event:<t>` (string, `content`) | yes |
+| Unknown event type `<t>` | `/World/Instances/<name>/Stream` | — | `acsf:event:<t>` (string, `content`; `<t>` sanitised and disambiguated like interlocutor names) | yes |
+
+**Sampling rules.** The timeline is every integer cycle from the first to the last journaled
+one, including failed cycles that journaled nothing. String and token channels (`Stream`,
+`Stimulus`, `Interlocutors/*`) get a sample on every cycle of the timeline — the cycle's value, or `""` when the channel has no
+event that cycle — so a held string never carries over into a later cycle; `Memory`'s
+`acsf:consolidationStored` likewise has a sample (possibly 0) on every cycle. Values that
+describe a state rather than an event (`Cycle`, `Attention`, `Mood` when journaled,
+`acsf:longTermCount`, `Identity.acsf:selfConcept`) are sampled only on cycles whose events
+carry them; `acsf:selfConcept` additionally holds `""` on the first cycle when the first
+`identity_shift` comes later, because USD holds the first sample backwards in time. Several
+events of one channel in one cycle are joined with a newline. `acsf:timestamp` is the cycle's
+`thought` time (else its first event's). `acsf:perceptionSource` is the `<source>` in the
+`"[<source>: <title>] …"` prefix ACSF writes into a perception's `content`
+([`core/consciousness.py` L954–L956](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/blob/64486d9c580325df33f03e8cb20dc7b8a227189a/consciousness-sim/core/consciousness.py#L954-L956)).
+Interlocutor prim names are sanitised like instance names, disambiguated deterministically
+(`_2`, `_3`, … in sorted order of the raw names).
 
 Strings, tokens and bools are not interpolated by USD: a value held at cycle *n* stays until
 the next sample (verified with `usd-core` 26.8: a string sampled at t=0 and t=1 resolves to
@@ -220,7 +236,7 @@ composition stays batch-only.
 - **Golden-run end-to-end:** copies of ACSF's committed golden runs
   (`consciousness-sim/experiments/golden/{Echo,Rafael,Sage,Wren}/`, MIT, attributed and
   pinned to `64486d9`) exported in CI; e.g. Echo yields 200 `acsf:thought` samples and 67
-  perception samples (counts taken from that file at that commit).
+  non-empty `acsf:perception` samples (counts taken from that file at that commit).
 - **Read-only guarantee:** the export test snapshots the input directory's file hashes and
   mtimes before and after and asserts no change.
 - **Determinism:** exporting the same input twice produces byte-identical `.usda`.

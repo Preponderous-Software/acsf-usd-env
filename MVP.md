@@ -47,9 +47,10 @@ Direction: **ACSF → USD only.** The USD → ACSF direction ends the MVP as a w
 1. `pip install .` on Python 3.11 installs the package and an `acsf-usd` command; `usd-core` is
    pinned to `26.8`.
 2. `acsf-usd export <golden Echo dir> -o echo.usda` exits 0; `Usd.Stage.Open("echo.usda")`
-   succeeds; `/World/Instances/Echo/Stream.acsf:thought` has **200** time samples and the
-   stimulus channel has **67** (the event counts in ACSF's committed `golden/Echo/journal.jsonl`
-   at commit `64486d9`).
+   succeeds; `/World/Instances/Echo/Stream.acsf:thought` has **200** time samples and
+   `Stimulus.acsf:perception` has **67** non-empty samples (the event counts in ACSF's committed
+   `golden/Echo/journal.jsonl` at commit `64486d9`; every other cycle holds `""` so a perception
+   never carries over into a later cycle).
 3. For every journaled `thought`, the attribute value at its cycle equals the journal `content`
    byte-for-byte (checked by `acsf-usd validate`).
 4. A journal containing `cycle` events is indexed by their `thought_count`; one without is

@@ -10,7 +10,8 @@ from pxr import Sdf, Usd, UsdGeom
 
 from acsf_usd import __version__
 from acsf_usd.model import InstanceRun
-from acsf_usd.stage.common import INSTANCES, WORLD, instance_path, set_attr
+from acsf_usd.stage.channels import ChannelSummary, author_channels, journaled_mood_dims
+from acsf_usd.stage.common import INSTANCES, WORLD, instance_path, set_attr, unique_names
 from acsf_usd.stage.snapshot import author_snapshot
 
 log = logging.getLogger(__name__)
@@ -19,10 +20,12 @@ log = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class ExportOptions:
     time_codes_per_second: float = 1.0
+    source_commit: str | None = None
 
 
 def build_instance_stage(run: InstanceRun, options: ExportOptions | None = None) -> Usd.Stage:
     """Author one instance into a new in-memory stage."""
+    options = options or ExportOptions()
     stage = Usd.Stage.CreateInMemory()
     world = UsdGeom.Xform.Define(stage, WORLD)
     stage.SetDefaultPrim(world.GetPrim())
@@ -33,26 +36,44 @@ def build_instance_stage(run: InstanceRun, options: ExportOptions | None = None)
     path = instance_path(run.name)
     instance = UsdGeom.Xform.Define(stage, path).GetPrim()
     set_attr(instance, "acsf:name", Sdf.ValueTypeNames.String, run.name)
+    # One mood-dimension naming for the snapshot and the journaled samples.
+    dims = set(journaled_mood_dims(run.journal))
     if run.snapshot is not None:
-        author_snapshot(stage, path, run.snapshot)
+        dims |= set(run.snapshot.mood) | set(run.snapshot.initial_mood)
+    mood_names = unique_names(dims)
+    if run.snapshot is not None:
+        author_snapshot(stage, path, run.snapshot, mood_names)
     else:
         log.warning(
             "%s: no state.json snapshot; Identity/Mood/Attention/Workspace omitted", run.name
         )
+    summary = author_channels(stage, path, run.journal, mood_names)
 
-    stage.GetRootLayer().customLayerData = layer_metadata(run)
+    stage.SetStartTimeCode(summary.first_cycle)
+    stage.SetEndTimeCode(summary.last_cycle)
+    stage.SetTimeCodesPerSecond(options.time_codes_per_second)
+    stage.GetRootLayer().customLayerData = layer_metadata(run, summary, options)
     return stage
 
 
-def layer_metadata(run: InstanceRun) -> dict[str, object]:
-    return {
+def layer_metadata(
+    run: InstanceRun, summary: ChannelSummary, options: ExportOptions
+) -> dict[str, object]:
+    data: dict[str, object] = {
         "acsf:exporterVersion": __version__,
         "acsf:cycleIndexing": run.journal.indexing,
         "acsf:layout:synthetic": True,
+        "acsf:moodSampling": "final" if summary.mood_first_cycle is None else "journaled",
     }
+    if summary.mood_first_cycle is not None:
+        data["acsf:moodFirstCycle"] = summary.mood_first_cycle
+    if options.source_commit:
+        data["acsf:sourceCommit"] = options.source_commit
+    return data
 
 
-def write_stage(stage: Usd.Stage, output: Path) -> None:
-    """Export the stage's root layer; the format follows the output extension."""
-    if not stage.GetRootLayer().Export(str(output)):
+def write_stage(stage: Usd.Stage, output: Path, binary: bool = False) -> None:
+    """Export the stage's root layer as text (``usda``) or binary crate (``usdc``)."""
+    args = {"format": "usdc" if binary else "usda"}
+    if not stage.GetRootLayer().Export(str(output), "", args):
         raise OSError(f"could not write {output}")
