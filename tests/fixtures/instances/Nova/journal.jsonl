@@ -1,0 +1,20 @@
+{"timestamp": "2026-10-17T12:00:01.000000+00:00", "type": "perception", "content": "[wikipedia: Tide pool] A tide pool is a shallow pool of seawater."}
+{"timestamp": "2026-10-17T12:00:02.000000+00:00", "type": "thought", "content": "Nova thought one."}
+{"timestamp": "2026-10-17T12:00:03.000000+00:00", "type": "cycle", "content": "cycle 1: metacognitive-stable", "thought_count": 1, "retrieved": [], "prediction": {"prior": "p", "next": "n", "error": 0.4}, "metacognitive_label": "metacognitive-stable", "reflection": {"base": 0.2, "hot2_boost": 0.0, "pp1_boost": 0.05, "effective": 0.25, "fired": false}, "attention": {"focus": "thought", "theme": "tides", "salience": 0.8}, "perception_title": null, "short_term_size": 3, "timings_ms": {"generate": 10}, "prompt_chars": 100}
+{"timestamp": "2026-10-17T12:00:04.000000+00:00", "type": "memory", "content": "Long-term store: 4 memories", "long_term_count": 4}
+{"timestamp": "2026-10-17T12:00:05.000000+00:00", "type": "consolidation", "content": "stored=2 events_in=5 fallback=False long_term_total=6", "stored": 2, "events_in": 5, "fell_through_to_fallback": false, "elapsed_s": 0.5, "long_term_total": 6}
+{not json at all
+{"timestamp": "2026-10-17T12:00:06.000000+00:00", "type": "perception", "content": "[speech: Dana says] Hello Nova, what are you thinking about?"}
+{"timestamp": "2026-10-17T12:00:07.000000+00:00", "type": "thought", "content": "Nova thought two, about \"quotes\" and \u00e9 accents\nand a newline."}
+{"timestamp": "2026-10-17T12:00:08.000000+00:00", "type": "cycle", "content": "cycle 2: metacognitive-surprised", "thought_count": 2, "retrieved": [{"summary": "SECRET-LTM-2-a"}, {"summary": "SECRET-LTM-2-b"}], "prediction": {"prior": "p", "next": "n", "error": 2.5}, "metacognitive_label": "metacognitive-surprised", "reflection": {"base": 0.2, "hot2_boost": 0.0, "pp1_boost": 0.05, "effective": 0.6, "fired": true}, "attention": {"focus": "perception", "theme": "greeting", "salience": 0.95}, "perception_title": null, "short_term_size": 4, "timings_ms": {"generate": 10}, "prompt_chars": 100}
+{"timestamp": "2026-10-17T12:00:09.000000+00:00", "type": "utterance", "content": "Hello Dana. I was thinking about tide pools.", "to": "Dana", "in_reply_to": "Hello Nova, what are you thinking about?"}
+{"timestamp": "2026-10-17T12:00:10.000000+00:00", "type": "reflection", "content": "I am someone who answers when spoken to."}
+{"timestamp": "2026-10-17T12:00:11.000000+00:00", "type": "identity_shift", "content": "I am Nova, a mind that answers."}
+{"timestamp": "2026-10-17T12:00:12.000000+00:00", "type": "memory", "content": "Long-term store: 5 memories", "long_term_count": 5}
+[1, 2, 3]
+
+{"timestamp": "2026-10-17T12:00:13.000000+00:00", "type": "thought", "content": "Nova thought four, after a failed cycle three."}
+{"timestamp": "2026-10-17T12:00:14.000000+00:00", "type": "cycle", "content": "cycle 4: metacognitive-stable", "thought_count": 4, "retrieved": [{"summary": "SECRET-LTM-4-a", "score": 0.9}], "prediction": {"prior": "p", "next": "n", "error": 0.4}, "metacognitive_label": "metacognitive-stable", "reflection": {"base": 0.2, "hot2_boost": 0.0, "pp1_boost": 0.05, "effective": 0.25, "fired": false}, "attention": {"focus": "thought", "theme": "tides", "salience": 0.8}, "perception_title": null, "short_term_size": 5, "timings_ms": {"generate": 10}, "prompt_chars": 100}
+{"timestamp": "2026-10-17T12:00:15.000000+00:00", "type": "custom_probe", "content": "an event type this exporter does not know", "detail": 1}
+{"timestamp": "2026-10-17T12:00:16.000000+00:00", "type": "utterance", "content": "Goodbye, Robin.", "to": "Robin", "in_reply_to": "bye"}
+{"timestamp": "2026-10-17T12:00:17.000000+00:00", "type": "memory", "content": "Long-term store: 7 memories", "long_term_count": 7}

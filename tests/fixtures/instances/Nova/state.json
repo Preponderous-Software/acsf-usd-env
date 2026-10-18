@@ -1,0 +1,55 @@
+{
+  "identity": {
+    "name": "Nova",
+    "origin_story": "A synthetic fixture instance.\n",
+    "values": [
+      "curiosity",
+      "care"
+    ],
+    "purpose": "To exercise every mapped field.",
+    "self_concept": "I am Nova, a mind that answers.",
+    "personality_traits": [
+      "calm"
+    ],
+    "amendments": [
+      "I am someone who answers when spoken to"
+    ],
+    "mood": {
+      "curiosity": 0.75,
+      "wonder": 0.5
+    },
+    "initial_mood": {
+      "curiosity": 0.7,
+      "wonder": 0.6
+    },
+    "attention_schema": {
+      "focus": "thought",
+      "theme": "tides",
+      "salience": 0.8,
+      "history": [
+        "perception",
+        "thought"
+      ]
+    }
+  },
+  "short_term": [
+    {
+      "kind": "thought",
+      "content": "Nova thought four, after a failed cycle three.",
+      "timestamp": "2026-10-17T12:00:16.000000+00:00",
+      "importance": 1.5,
+      "seq": 7
+    },
+    {
+      "kind": "perception",
+      "content": "[speech: Dana says] Hello Nova",
+      "timestamp": "2026-10-17T12:00:07.000000+00:00",
+      "importance": 2.0,
+      "seq": 3
+    }
+  ],
+  "thought_count": 4,
+  "health": {
+    "status": "ok"
+  }
+}
