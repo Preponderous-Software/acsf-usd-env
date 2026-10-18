@@ -11,7 +11,7 @@ import shutil
 from pathlib import Path
 
 import pytest
-from pxr import Usd
+from pxr import Sdf, Usd
 
 from acsf_usd.cli import main
 from acsf_usd.reader import read_instance
@@ -105,6 +105,85 @@ def test_validate_fails_when_validated_against_the_wrong_journal(tmp_path: Path)
     impostor = tmp_path / "Wren"
     shutil.copytree(GOLDEN / "Echo", impostor)
     assert main(["validate", str(out), str(impostor)]) == 1
+
+
+def _nova_stage(tmp_path: Path) -> tuple[Path, Usd.Stage]:
+    out = tmp_path / "nova.usda"
+    assert main(["export", str(INSTANCES / "Nova"), "-o", str(out)]) == 0
+    stage = Usd.Stage.Open(str(out))
+    assert stage is not None
+    return out, stage
+
+
+def _validate(out: Path, capsys: pytest.CaptureFixture[str]) -> tuple[int, str]:
+    capsys.readouterr()
+    code = main(["validate", str(out), str(INSTANCES / "Nova")])
+    return code, capsys.readouterr().out
+
+
+def test_validate_reports_a_reply_with_no_source_event(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out, stage = _nova_stage(tmp_path)
+    prim = stage.DefinePrim("/World/Instances/Nova/Interlocutors/Ghost")
+    prim.CreateAttribute("acsf:sender", Sdf.ValueTypeNames.String).Set("Ghost")
+    prim.CreateAttribute("acsf:utterance", Sdf.ValueTypeNames.String).Set("boo", 2)
+    stage.GetRootLayer().Save()
+    code, report = _validate(out, capsys)
+    assert code == 1
+    assert "Interlocutors[Ghost].acsf:utterance cycle 2" in report
+
+
+@pytest.mark.parametrize(
+    "remove", ["/World/Instances/Nova/Stream", "/World/Instances/Nova/Stimulus"]
+)
+def test_validate_reports_a_missing_channel_prim(
+    remove: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out, stage = _nova_stage(tmp_path)
+    stage.RemovePrim(remove)
+    stage.GetRootLayer().Save()
+    code, report = _validate(out, capsys)
+    assert code == 1
+    assert "attribute missing" in report
+
+
+def test_validate_reports_a_missing_utterance_attribute(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out, stage = _nova_stage(tmp_path)
+    stage.GetPrimAtPath("/World/Instances/Nova/Interlocutors/Dana").RemoveProperty("acsf:utterance")
+    stage.GetRootLayer().Save()
+    code, report = _validate(out, capsys)
+    assert code == 1
+    assert "Interlocutors[Dana].acsf:utterance: attribute missing" in report
+
+
+def test_validate_reports_every_mismatching_cycle(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = tmp_path / "echo.usda"
+    assert main(["export", str(GOLDEN / "Echo"), "-o", str(out)]) == 0
+    stage = Usd.Stage.Open(str(out))
+    thought = stage.GetPrimAtPath("/World/Instances/Echo/Stream").GetAttribute("acsf:thought")
+    for cycle in range(1, 31):
+        thought.Set("tampered", cycle)
+    stage.GetRootLayer().Save()
+    capsys.readouterr()
+    assert main(["validate", str(out), str(GOLDEN / "Echo")]) == 1
+    report = capsys.readouterr().out
+    for cycle in range(1, 31):
+        assert f"Stream.acsf:thought cycle {cycle}:" in report
+    assert "30 problem(s)" in report
+
+
+def test_validate_on_a_state_only_instance(tmp_path: Path) -> None:
+    directory = tmp_path / "Still"
+    directory.mkdir()
+    shutil.copy(INSTANCES / "Ash" / "state.json", directory / "state.json")
+    out = tmp_path / "still.usda"
+    assert main(["export", str(directory), "-o", str(out)]) == 0
+    assert main(["validate", str(out), str(directory)]) == 0
 
 
 def test_validate_fails_on_wrong_cycle_indexing(tmp_path: Path) -> None:

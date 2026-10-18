@@ -26,7 +26,6 @@ TEXT_CHANNELS: dict[str, tuple[str, str]] = {
     "reflection": ("Stream", "acsf:reflection"),
     "perception": ("Stimulus", "acsf:perception"),
 }
-MAX_REPORTED = 20
 
 
 @dataclass
@@ -77,15 +76,22 @@ def validate_instance(stage: Usd.Stage, run: InstanceRun, prim_name_: str) -> In
     channels: list[tuple[str, Usd.Attribute | None, dict[int, list[str]]]] = []
     for child, attr_name in TEXT_CHANNELS.values():
         label = f"{child}.{attr_name}"
-        attr = stage.GetPrimAtPath(path.AppendChild(child)).GetAttribute(attr_name)
-        channels.append((label, attr if attr.IsValid() else None, expected[(child, attr_name)]))
-    senders = _interlocutors(stage, path)
-    for key, values in expected.items():
-        if key[0] != "Interlocutors":
-            continue
-        sender = key[1]
-        attr = senders.get(sender)
-        channels.append((f"Interlocutors[{sender}].acsf:utterance", attr, values))
+        channels.append(
+            (
+                label,
+                _attribute(stage, path.AppendChild(child), attr_name),
+                expected[(child, attr_name)],
+            )
+        )
+    stage_senders = _interlocutors(stage, path)
+    journal_senders = {key[1] for key in expected if key[0] == "Interlocutors"}
+    # Recipients present only in the stage are checked against empty expectations, so a
+    # reply with no source event is reported.
+    for sender in sorted(journal_senders | set(stage_senders)):
+        values = expected[("Interlocutors", sender)] if sender in journal_senders else {}
+        channels.append(
+            (f"Interlocutors[{sender}].acsf:utterance", stage_senders.get(sender), values)
+        )
 
     for label, attr, values in channels:
         if attr is None:
@@ -109,15 +115,26 @@ def validate_instance(stage: Usd.Stage, run: InstanceRun, prim_name_: str) -> In
     return report
 
 
-def _interlocutors(stage: Usd.Stage, instance: Sdf.Path) -> dict[str, Usd.Attribute]:
-    result: dict[str, Usd.Attribute] = {}
+def _attribute(stage: Usd.Stage, prim_path: Sdf.Path, name: str) -> Usd.Attribute | None:
+    """The attribute, or ``None`` when the prim or the attribute is absent."""
+    prim = stage.GetPrimAtPath(prim_path)
+    if not prim.IsValid():
+        return None
+    attr = prim.GetAttribute(name)
+    return attr if attr.IsValid() else None
+
+
+def _interlocutors(stage: Usd.Stage, instance: Sdf.Path) -> dict[str, Usd.Attribute | None]:
+    """Each interlocutor's ``acsf:utterance`` keyed by its ``acsf:sender`` (``None`` when the
+    attribute is missing)."""
+    result: dict[str, Usd.Attribute | None] = {}
     parent = stage.GetPrimAtPath(instance.AppendChild("Interlocutors"))
     if not parent.IsValid():
         return result
     for prim in parent.GetChildren():
         sender = prim.GetAttribute("acsf:sender")
         if sender.IsValid():
-            result[str(sender.Get())] = prim.GetAttribute("acsf:utterance")
+            result[str(sender.Get())] = _attribute(stage, prim.GetPath(), "acsf:utterance")
     return result
 
 
@@ -161,8 +178,5 @@ def format_report(report: InstanceReport) -> list[str]:
     counts = ", ".join(f"{n} {kind}" for kind, n in sorted(report.checked.items()))
     status = "OK" if not report.problems else f"{len(report.problems)} problem(s)"
     lines = [f"{report.name} ({report.prim}): {status} — {report.cycles} cycles; {counts}"]
-    for problem in report.problems[:MAX_REPORTED]:
-        lines.append(f"  {problem}")
-    if len(report.problems) > MAX_REPORTED:
-        lines.append(f"  … and {len(report.problems) - MAX_REPORTED} more")
+    lines.extend(f"  {problem}" for problem in report.problems)
     return lines
