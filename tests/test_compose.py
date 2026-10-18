@@ -160,17 +160,23 @@ def test_root_that_would_overwrite_an_instance_layer_is_a_usage_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
+    (tmp_path / "Ash.usda").write_text("previous export")
     with pytest.raises(SystemExit) as excinfo:
         main(["export", str(INSTANCES / "Nova"), str(INSTANCES / "Ash"), "-o", "Nova.usda"])
     assert excinfo.value.code == 2
+    # Rejected before writing anything: the earlier Ash layer is untouched, no Nova layer.
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["Ash.usda"]
+    assert (tmp_path / "Ash.usda").read_text() == "previous export"
 
 
-def test_output_inside_a_collection_is_refused(tmp_path: Path) -> None:
+@pytest.mark.parametrize("inside", ["Nova/run.usda", "run.usda"])
+def test_output_inside_a_collection_is_refused(tmp_path: Path, inside: str) -> None:
     home = tmp_path / "home"
     shutil.copytree(INSTANCES, home)
     with pytest.raises(SystemExit) as excinfo:
-        main(["export", str(home), "-o", str(home / "Nova" / "run.usda")])
+        main(["export", str(home), "-o", str(home / inside)])
     assert excinfo.value.code == 2
+    assert sorted(p.name for p in home.iterdir()) == ["Ash", "Lumen", "Nova"]
     assert sorted(p.name for p in (home / "Nova").iterdir()) == ["journal.jsonl", "state.json"]
 
 

@@ -66,16 +66,16 @@ def export_composed(
     extension = ".usdc" if binary else ".usda"
     prims = disambiguate(runs)
     ordered = sorted(zip(prims, runs, strict=True), key=lambda pair: pair[0])
-    layers: list[Path] = []
-    first: list[float] = []
-    last: list[float] = []
-    for prim, run in ordered:
-        stage = build_instance_stage(run, options, prim=prim)
-        path = root.parent / f"{prim}{extension}"
+    layers = [root.parent / f"{prim}{extension}" for prim, _ in ordered]
+    # Preflight: a rejected export must not have written (or overwritten) anything.
+    for path in layers:
         if path.resolve() == root.resolve():
             raise ValueError(f"{root}: the root layer would overwrite instance layer {path.name}")
+    first: list[float] = []
+    last: list[float] = []
+    for (prim, run), path in zip(ordered, layers, strict=True):
+        stage = build_instance_stage(run, options, prim=prim)
         write_stage(stage, path, binary=binary)
-        layers.append(path)
         first.append(stage.GetStartTimeCode())
         last.append(stage.GetEndTimeCode())
 

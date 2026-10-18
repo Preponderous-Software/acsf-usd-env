@@ -122,19 +122,21 @@ def describe_run(run: InstanceRun) -> str:
 
 def run_export(args: argparse.Namespace) -> int:
     directories, collection = resolve_inputs(args.inputs)
+    # Collection directories themselves are inputs too: nothing may be written inside them.
+    protected = directories + [Path(arg) for arg in args.inputs if Path(arg).is_dir()]
     options = ExportOptions(
         time_codes_per_second=args.time_codes_per_second, source_commit=args.source_commit
     )
     if len(directories) == 1 and not collection:
         run = read_instance(directories[0])
         output = output_path(args.output, run.name, args.binary)
-        refuse_output_inside(output, directories)
+        refuse_output_inside(output, protected)
         write_stage(build_instance_stage(run, options), output, binary=args.binary)
         print(f"wrote {output} ({describe_run(run)})")
         return 0
 
     output = output_path(args.output, "run", args.binary)
-    refuse_output_inside(output, directories)
+    refuse_output_inside(output, protected)
     runs = [read_instance(directory) for directory in directories]
     try:
         result = export_composed(runs, output, options, binary=args.binary)
