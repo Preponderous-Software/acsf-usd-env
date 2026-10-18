@@ -10,8 +10,10 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from acsf_usd import __version__
-from acsf_usd.reader import InputError, read_instance, resolve_instance_dir
+from acsf_usd.model import InstanceRun
+from acsf_usd.reader import InputError, read_instance, resolve_inputs
 from acsf_usd.stage.build import ExportOptions, build_instance_stage, write_stage
+from acsf_usd.stage.compose import export_composed
 
 log = logging.getLogger("acsf_usd")
 
@@ -35,17 +37,29 @@ def build_parser() -> argparse.ArgumentParser:
         "export",
         help="export an ACSF instance to a USD stage",
         description=(
-            "Export an ACSF instance directory, experiment run directory, golden-run "
-            "directory, or instance name under CONSCIOUSNESS_HOME to a USD stage. The input "
-            "is only read, never modified."
+            "Export ACSF instances to a USD stage. Each input is an instance directory, an "
+            "experiment run or golden-run directory, an instance name under "
+            "CONSCIOUSNESS_HOME, or a directory of instance directories (a whole "
+            "CONSCIOUSNESS_HOME, or an experiment run with replicate-<i>/ subdirectories). One "
+            "instance gives one layer; several give one layer per instance plus a root layer "
+            "that sublayers them on one shared timeline. Inputs are only read, never modified."
         ),
     )
-    export.add_argument("input", help="instance directory, run directory, or instance name")
+    export.add_argument(
+        "inputs",
+        nargs="+",
+        metavar="input",
+        help="instance directory, run directory, instance name, or directory of instances",
+    )
     export.add_argument(
         "-o",
         "--output",
         type=Path,
-        help="output file (default: <name>.usda, or <name>.usdc with --binary)",
+        help=(
+            "output file (default: <name>.usda for one instance, run.usda for several; "
+            ".usdc with --binary). Instance layers of a multi-instance export are written "
+            "next to it"
+        ),
     )
     export.add_argument(
         "--binary", action="store_true", help="write binary .usdc instead of text .usda"
@@ -97,22 +111,40 @@ def refuse_output_inside(output: Path, inputs: Sequence[Path]) -> None:
             )
 
 
+def describe_run(run: InstanceRun) -> str:
+    cycles = run.journal.cycles
+    span = f"cycles {cycles[0]}–{cycles[-1]}" if cycles else "no cycles"
+    return (
+        f"{run.name}: {len(run.journal.events)} events, {span}, "
+        f"{run.journal.indexing} indexing, {len(run.warnings)} warnings"
+    )
+
+
 def run_export(args: argparse.Namespace) -> int:
-    directory = resolve_instance_dir(args.input)
-    run = read_instance(directory)
-    output = output_path(args.output, run.name, args.binary)
-    refuse_output_inside(output, [directory])
+    directories, collection = resolve_inputs(args.inputs)
+    # Collection directories themselves are inputs too: nothing may be written inside them.
+    protected = directories + [Path(arg) for arg in args.inputs if Path(arg).is_dir()]
     options = ExportOptions(
         time_codes_per_second=args.time_codes_per_second, source_commit=args.source_commit
     )
-    stage = build_instance_stage(run, options)
-    write_stage(stage, output, binary=args.binary)
-    cycles = run.journal.cycles
-    span = f"cycles {cycles[0]}–{cycles[-1]}" if cycles else "no cycles"
-    print(
-        f"wrote {output} ({run.name}: {len(run.journal.events)} events, {span}, "
-        f"{run.journal.indexing} indexing, {len(run.warnings)} warnings)"
-    )
+    if len(directories) == 1 and not collection:
+        run = read_instance(directories[0])
+        output = output_path(args.output, run.name, args.binary)
+        refuse_output_inside(output, protected)
+        write_stage(build_instance_stage(run, options), output, binary=args.binary)
+        print(f"wrote {output} ({describe_run(run)})")
+        return 0
+
+    output = output_path(args.output, "run", args.binary)
+    refuse_output_inside(output, protected)
+    runs = [read_instance(directory) for directory in directories]
+    try:
+        result = export_composed(runs, output, options, binary=args.binary)
+    except ValueError as exc:
+        raise UsageError(str(exc)) from None
+    for layer, run in zip(result.layers, result.runs, strict=True):
+        print(f"wrote {layer} ({describe_run(run)})")
+    print(f"wrote {output} (root layer sublayering {len(result.layers)} instances)")
     return 0
 
 

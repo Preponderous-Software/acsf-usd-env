@@ -191,6 +191,29 @@ across runs and machines — and is visible on cycles with an utterance to it. E
 prim carries `doc` metadata saying it is synthetic. Multiple instances are offset along X.
 These positions encode nothing ACSF knows and must never be read as such.
 
+## Multi-instance composition
+
+`acsf-usd export` takes one or more inputs. An input may also be a directory holding instance
+directories — a whole `CONSCIOUSNESS_HOME`, or an experiment run with `replicate-<i>/`
+subdirectories. One instance gives one layer. Several (or any directory of instances) give
+one layer per instance, written next to the root layer (`-o`, default `run.usda`), plus a root
+layer whose `subLayerPaths` list them in prim-name order. Each instance layer is the same
+file a single-instance export writes, so it opens on its own. The root layer holds what
+belongs to the group:
+
+- `startTimeCode` / `endTimeCode` spanning every instance, so all of them share one timeline;
+- `timeCodesPerSecond`, `defaultPrim`, `upAxis`, `metersPerUnit`;
+- an `over` per instance translating it `10 × i` along X (part of the synthetic layout);
+- `customLayerData` with `acsf:exporterVersion`, `acsf:layout:synthetic = true` and
+  `acsf:instanceCount`.
+
+Per-instance `acsf:cycleIndexing` and `acsf:moodSampling` stay in each instance layer.
+
+Two inputs whose names sanitise to the same prim name are ranked by (prim name, raw name,
+resolved source path). The first keeps the name and later ones get `_2`, `_3` …, so the
+result does not depend on argument order. `acsf:name` keeps the raw name. A root path that
+would overwrite an instance layer is a usage error.
+
 ## Live mode (follow)
 
 `acsf-usd export <instance> -o <file> --follow` exports the journal as it stands, then keeps

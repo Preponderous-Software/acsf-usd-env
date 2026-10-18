@@ -36,7 +36,7 @@ def read_journal(path: Path) -> JournalParse:
     try:
         with path.open("rb") as handle:
             for line_no, raw in enumerate(handle, start=1):
-                _accept(raw, line_no, events, warnings)
+                _accept(raw, line_no, events, warnings, str(path))
     except FileNotFoundError:
         return JournalParse((), ())
     return JournalParse(tuple(events), tuple(warnings))
@@ -50,17 +50,19 @@ def split_lines(data: bytes) -> list[bytes]:
     return lines
 
 
-def parse_journal_bytes(data: bytes, first_line_no: int = 1) -> JournalParse:
+def parse_journal_bytes(
+    data: bytes, first_line_no: int = 1, label: str = "journal"
+) -> JournalParse:
     """Parse journal bytes already in memory (follow mode reads appended chunks)."""
     events: list[Event] = []
     warnings: list[str] = []
     for offset, raw in enumerate(split_lines(data)):
-        _accept(raw, first_line_no + offset, events, warnings)
+        _accept(raw, first_line_no + offset, events, warnings, label)
     return JournalParse(tuple(events), tuple(warnings))
 
 
-def _accept(raw: bytes, line_no: int, events: list[Event], warnings: list[str]) -> None:
-    event, warning = parse_line(raw, line_no)
+def _accept(raw: bytes, line_no: int, events: list[Event], warnings: list[str], label: str) -> None:
+    event, warning = parse_line(raw, line_no, label)
     if warning is not None:
         log.warning("%s", warning)
         warnings.append(warning)
@@ -68,23 +70,23 @@ def _accept(raw: bytes, line_no: int, events: list[Event], warnings: list[str]) 
         events.append(event)
 
 
-def parse_line(raw: bytes, line_no: int) -> tuple[Event | None, str | None]:
+def parse_line(raw: bytes, line_no: int, label: str = "journal") -> tuple[Event | None, str | None]:
     """Parse one journal line into an event, or explain why it was skipped."""
     try:
         text = raw.decode("utf-8").strip()
     except UnicodeDecodeError:
-        return None, f"journal line {line_no}: skipping line that is not valid UTF-8"
+        return None, f"{label} line {line_no}: skipping line that is not valid UTF-8"
     if not text:
         return None, None
     try:
         payload: Any = json.loads(text)
     except json.JSONDecodeError:
-        return None, f"journal line {line_no}: skipping corrupted line: {text[:80]!r}"
+        return None, f"{label} line {line_no}: skipping corrupted line: {text[:80]!r}"
     if not isinstance(payload, dict):
-        return None, f"journal line {line_no}: skipping non-object line: {text[:80]!r}"
+        return None, f"{label} line {line_no}: skipping non-object line: {text[:80]!r}"
     event_type = payload.get("type")
     if not isinstance(event_type, str) or not event_type:
-        return None, f"journal line {line_no}: skipping object without a string 'type'"
+        return None, f"{label} line {line_no}: skipping object without a string 'type'"
     content = _as_text(payload.get("content", ""))
     timestamp = payload.get("timestamp", "")
     extras = {k: v for k, v in payload.items() if k not in _CANONICAL}
@@ -95,7 +97,7 @@ def parse_line(raw: bytes, line_no: int) -> tuple[Event | None, str | None]:
         retrieved = extras.pop("retrieved", None)
         trace = _cycle_trace(extras, retrieved)
         if trace is None:
-            warning = f"journal line {line_no}: 'cycle' event without an integer thought_count"
+            warning = f"{label} line {line_no}: 'cycle' event without an integer thought_count"
     return (
         Event(
             line_no=line_no,
