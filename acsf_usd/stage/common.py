@@ -27,6 +27,25 @@ def prim_name(name: str) -> str:
     return cleaned
 
 
+def unique_names(names: Iterable[str]) -> dict[str, str]:
+    """Map raw strings to distinct valid names, deterministically.
+
+    Raw strings are taken in sorted order; when two sanitise to the same name, later ones get
+    ``_2``, ``_3`` … suffixes (skipping any name already taken).
+    """
+    result: dict[str, str] = {}
+    used: set[str] = set()
+    for raw in sorted(set(names)):
+        base = prim_name(raw)
+        candidate, n = base, 1
+        while candidate in used:
+            n += 1
+            candidate = f"{base}_{n}"
+        used.add(candidate)
+        result[raw] = candidate
+    return result
+
+
 def instance_path(name: str) -> Sdf.Path:
     return Sdf.Path(f"{INSTANCES}/{prim_name(name)}")
 

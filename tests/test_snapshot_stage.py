@@ -9,9 +9,11 @@ from pathlib import Path
 import pytest
 from pxr import Sdf, Usd, UsdGeom
 
+from acsf_usd.model import Snapshot
 from acsf_usd.reader import read_instance
 from acsf_usd.stage.build import build_instance_stage, write_stage
-from acsf_usd.stage.common import prim_name
+from acsf_usd.stage.common import prim_name, unique_names
+from acsf_usd.stage.snapshot import author_snapshot
 from tests.conftest import INSTANCES
 
 T = Sdf.ValueTypeNames
@@ -126,6 +128,34 @@ def test_missing_state_omits_snapshot_prims_with_warning(
 )
 def test_prim_name(raw: str, expected: str) -> None:
     assert prim_name(raw) == expected
+
+
+def test_unique_names() -> None:
+    assert unique_names(["self-confidence", "self_confidence", "self_confidence_2", "x"]) == {
+        "self-confidence": "self_confidence",
+        "self_confidence": "self_confidence_2",
+        "self_confidence_2": "self_confidence_2_2",
+        "x": "x",
+    }
+
+
+def test_mood_dimensions_that_sanitise_alike_stay_distinct() -> None:
+    stage = Usd.Stage.CreateInMemory()
+    path = Sdf.Path("/World/Instances/X")
+    snapshot = Snapshot(
+        mood={"self-confidence": 0.1, "self_confidence": 0.2},
+        initial_mood={"self_confidence": 0.3, "only-baseline": 0.4, "only_baseline": 0.5},
+    )
+    author_snapshot(stage, path, snapshot)
+    mood = stage.GetPrimAtPath(path.AppendChild("Mood"))
+    values = {a.GetName(): a.Get() for a in mood.GetAttributes()}
+    assert values == {
+        "acsf:mood:self_confidence": 0.1,
+        "acsf:mood:self_confidence_2": 0.2,
+        "acsf:moodBaseline:self_confidence_2": 0.3,
+        "acsf:moodBaseline:only_baseline": 0.4,
+        "acsf:moodBaseline:only_baseline_2": 0.5,
+    }
 
 
 def test_instance_name_is_sanitised_and_kept(tmp_path: Path) -> None:

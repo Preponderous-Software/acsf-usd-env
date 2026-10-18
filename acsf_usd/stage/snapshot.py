@@ -10,7 +10,7 @@ from __future__ import annotations
 from pxr import Sdf, Usd
 
 from acsf_usd.model import Snapshot, WorkspaceItem
-from acsf_usd.stage.common import prim_name, set_attr, string_array
+from acsf_usd.stage.common import set_attr, string_array, unique_names
 
 T = Sdf.ValueTypeNames
 
@@ -32,10 +32,13 @@ def author_snapshot(stage: Usd.Stage, instance: Sdf.Path, snapshot: Snapshot) ->
         set_attr(identity, attr_name, T.StringArray, string_array(items))
 
     mood = stage.DefinePrim(instance.AppendChild("Mood"))
+    # One mapping for both maps, so a dimension keeps the same name in both attributes and
+    # dimensions that sanitise alike (``self-confidence`` / ``self_confidence``) stay distinct.
+    dims = unique_names([*snapshot.mood, *snapshot.initial_mood])
     for dim, value in sorted(snapshot.mood.items()):
-        set_attr(mood, f"acsf:mood:{prim_name(dim)}", T.Double, value)
+        set_attr(mood, f"acsf:mood:{dims[dim]}", T.Double, value)
     for dim, value in sorted(snapshot.initial_mood.items()):
-        set_attr(mood, f"acsf:moodBaseline:{prim_name(dim)}", T.Double, value)
+        set_attr(mood, f"acsf:moodBaseline:{dims[dim]}", T.Double, value)
 
     attention = stage.DefinePrim(instance.AppendChild("Attention"))
     if snapshot.attention_focus is not None:
