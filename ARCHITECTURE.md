@@ -72,6 +72,7 @@ acsf_usd/
   model.py      In-memory run model: Instance, Cycle, Event, Snapshot
   stage/        USD writers: static snapshot, time-sampled channels, schematic layout, composition
   follow.py     `--follow`: poll journal.jsonl from a byte offset, re-author the instance layer
+  validate.py   `acsf-usd validate`: re-read a stage and check it against its source journal
   cli.py        `acsf-usd export [--follow] [--binary] | validate | describe`
 tests/
   fixtures/     Small synthetic journals + states; golden-run copies pinned to an ACSF SHA
@@ -87,6 +88,7 @@ tests/
 | `stage.layout` | Author the schematic geometry and per-cycle visibility. |
 | `stage.compose` | One layer per instance; a root layer that sublayers them for multi-instance views. |
 | `follow` | Live mode for one instance: incremental, read-only journal polling; atomic re-write of the output layer (see [Live mode](#live-mode-follow)). |
+| `validate` | Recompute, from the indexed journal and independently of the channel writer, what every text channel (`acsf:thought`, `acsf:reflection`, `acsf:perception`, each interlocutor's `acsf:utterance`) must hold on every cycle, and compare byte-for-byte; also check `acsf:cycleIndexing`. Works on `.usda`, `.usdc` and composed root stages. |
 | `cli` | Resolve input (instance name under `CONSCIOUSNESS_HOME`, an instance dir, a run dir, or a `CONSCIOUSNESS_HOME`), write `.usda` (default) or `.usdc` (`--binary`), validate. |
 
 ### Cycle indexing rules

@@ -33,3 +33,12 @@ jobs:
         run: mypy
       - name: pytest
         run: pytest
+      - name: End-to-end on the golden runs (export, validate)
+        run: |
+          out="$RUNNER_TEMP/golden"
+          mkdir -p "$out"
+          acsf-usd export tests/fixtures/golden/Echo -o "$out/echo.usda"
+          acsf-usd validate "$out/echo.usda" tests/fixtures/golden/Echo
+          acsf-usd export tests/fixtures/golden -o "$out/golden.usdc" --binary
+          acsf-usd validate "$out/golden.usdc" tests/fixtures/golden
+          git diff --exit-code -- tests/fixtures
