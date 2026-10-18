@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -170,6 +172,30 @@ def test_output_inside_a_collection_is_refused(tmp_path: Path) -> None:
         main(["export", str(home), "-o", str(home / "Nova" / "run.usda")])
     assert excinfo.value.code == 2
     assert sorted(p.name for p in (home / "Nova").iterdir()) == ["journal.jsonl", "state.json"]
+
+
+def test_composition_writes_without_usd_warnings(tmp_path: Path) -> None:
+    script = (
+        "import sys; from pathlib import Path\n"
+        "from acsf_usd.reader import read_instance\n"
+        "from acsf_usd.stage.compose import export_composed\n"
+        "runs = [read_instance(Path(p)) for p in sys.argv[2:]]\n"
+        "export_composed(runs, Path(sys.argv[1]))\n"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            script,
+            str(tmp_path / "run.usda"),
+            *map(str, (INSTANCES / "Nova", INSTANCES / "Ash")),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "Could not load sublayer" not in result.stderr
+    assert "Warning" not in result.stderr
 
 
 def test_composed_export_is_deterministic(tmp_path: Path) -> None:

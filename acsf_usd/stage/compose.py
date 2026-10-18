@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from pxr import Gf, Usd, UsdGeom
+from pxr import Gf, Sdf, Usd, UsdGeom
 
 from acsf_usd import __version__
 from acsf_usd.model import InstanceRun
@@ -80,8 +80,6 @@ def export_composed(
         last.append(stage.GetEndTimeCode())
 
     stage = Usd.Stage.CreateInMemory()
-    layer = stage.GetRootLayer()
-    layer.subLayerPaths = [f"./{path.name}" for path in layers]
     stage.SetDefaultPrim(stage.OverridePrim(WORLD))
     UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.y)
     UsdGeom.SetStageMetersPerUnit(stage, 1.0)
@@ -99,8 +97,14 @@ def export_composed(
     }
     if options.source_commit:
         data["acsf:sourceCommit"] = options.source_commit
-    layer.customLayerData = data
-    write_stage(stage, root, binary=binary)
+    stage.GetRootLayer().customLayerData = data
+    # The sublayer paths are relative to the root file, so they are set on a stage-less copy
+    # of the layer: an in-memory stage would try (and fail) to resolve them.
+    layer = Sdf.Layer.CreateAnonymous()
+    layer.TransferContent(stage.GetRootLayer())
+    layer.subLayerPaths = [f"./{path.name}" for path in layers]
+    if not layer.Export(str(root), "", {"format": "usdc" if binary else "usda"}):
+        raise OSError(f"could not write {root}")
     return ComposedExport(
         root=root,
         layers=tuple(layers),
