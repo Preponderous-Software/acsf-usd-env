@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from acsf_usd import __version__
+from acsf_usd.follow import DEFAULT_POLL_INTERVAL, follow
 from acsf_usd.model import InstanceRun
 from acsf_usd.reader import InputError, read_instance, resolve_inputs
 from acsf_usd.stage.build import ExportOptions, build_instance_stage, write_stage
@@ -77,6 +78,23 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SHA",
         help="ACSF commit the run was produced with; recorded as acsf:sourceCommit",
     )
+    export.add_argument(
+        "--follow",
+        action="store_true",
+        help=(
+            "keep the output current while the instance runs: poll its journal, rewrite the "
+            "output atomically, and exit 0 after a final write on Ctrl-C/SIGTERM "
+            "(one instance only)"
+        ),
+    )
+    export.add_argument(
+        "--poll-interval",
+        type=_positive_float,
+        default=DEFAULT_POLL_INTERVAL,
+        metavar="S",
+        help=f"seconds between journal polls with --follow (default: {DEFAULT_POLL_INTERVAL})",
+    )
+
     check = commands.add_parser(
         "validate",
         help="check a stage against its source journal(s)",
@@ -147,6 +165,10 @@ def run_export(args: argparse.Namespace) -> int:
     options = ExportOptions(
         time_codes_per_second=args.time_codes_per_second, source_commit=args.source_commit
     )
+    if args.follow:
+        if len(directories) != 1 or collection:
+            raise UsageError("--follow takes exactly one instance (not several or a collection)")
+        return run_follow(args, directories[0], protected, options)
     if len(directories) == 1 and not collection:
         run = read_instance(directories[0])
         output = output_path(args.output, run.name, args.binary)
@@ -165,6 +187,28 @@ def run_export(args: argparse.Namespace) -> int:
     for layer, run in zip(result.layers, result.runs, strict=True):
         print(f"wrote {layer} ({describe_run(run)})")
     print(f"wrote {output} (root layer sublayering {len(result.layers)} instances)")
+    return 0
+
+
+def run_follow(
+    args: argparse.Namespace, directory: Path, protected: list[Path], options: ExportOptions
+) -> int:
+    output = output_path(args.output, directory.resolve().name, args.binary)
+    refuse_output_inside(output, protected)
+
+    def report(run: InstanceRun) -> None:
+        print(f"updated {output} ({describe_run(run)})", flush=True)
+
+    print(f"following {directory} -> {output} (Ctrl-C to stop)", flush=True)
+    follow(
+        directory,
+        output,
+        options,
+        binary=args.binary,
+        poll_interval=args.poll_interval,
+        on_write=report,
+    )
+    print(f"stopped; final write to {output}", flush=True)
     return 0
 
 

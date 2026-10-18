@@ -50,6 +50,19 @@ rate (default one cycle per second) and `--source-commit SHA` records the ACSF c
 produced with.
 
 ```bash
+acsf-usd export ~/.consciousness/Echo -o echo.usda --follow   # keep echo.usda current; Ctrl-C to stop
+```
+
+`--follow` keeps one running instance's stage current. It polls `journal.jsonl` every
+`--poll-interval` seconds (default 0.5) and consumes only complete lines. Each update
+re-authors the stage and replaces the output atomically, so a USD tool never sees a
+half-written file. The instance directory is only read; nothing is created in it. On Ctrl-C
+or SIGTERM it makes a final write and exits 0. That final file is byte-identical to a batch
+export of the same `journal.jsonl` and `state.json` (see
+[ARCHITECTURE.md § Live mode](./ARCHITECTURE.md#live-mode-follow)). USD tools that cache
+layers may need to reload the file to see updates.
+
+```bash
 acsf-usd validate echo.usda ~/.consciousness/Echo    # exit 0 when the stage matches the journal
 acsf-usd describe Echo                               # what an export would contain; writes nothing
 ```
