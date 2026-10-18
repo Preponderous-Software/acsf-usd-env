@@ -121,7 +121,7 @@ inside the provider or left explicitly open:
   a length cap and control-character stripping, **before** it returns a `Perception`. This
   narrows the risk; it does not guarantee protection against prompt injection. A
   memory-path defence inside ACSF (sanitising short-term rendering for every source,
-  Wikipedia included) is a separate question this note leaves open.
+  Wikipedia included) is a separate question this note leaves open (open question 8).
 - **Composition can reach other files.** A USD layer can reference, sublayer or payload
   other assets, and references and sublayers are opened while the stage is composed, before
   any attribute is inspected. Leaving payloads unloaded or reading only `acsf:describe`
@@ -168,14 +168,29 @@ perceives next. That later change is the part AE-2 is about, and it is not propo
    one, wall-clock time, or the cycle number?
 5. **Packaging.** Should the provider live in ACSF behind an optional extra, or in a separate
    package registered through the proposed registry? ACSF has no plugin entry points today
-   (`llm/perception.py` L247–L258).
+   (`llm/perception.py` L247–L258). Either way, the USD file path and selection policy need a
+   config route: `Consciousness.__init__` forwards only `provider`, `timeout_seconds`,
+   `cache_last_n` and `topic` today (`core/consciousness.py` L518–L523). Is a
+   provider-specific sub-block of the `perception` config, passed through to the factory,
+   acceptable, or is another route preferred?
 6. **Asset-access policy.** Should a scene be allowed to reference other files at all (with
    a resolver confined to an allow-listed directory), or must it be a single self-contained
-   layer that declares no sublayers, references or payloads?
+   layer that declares no sublayers, references or payloads? Because the provider is meant
+   to read untrusted files, this note suggests the single self-contained layer as the
+   default, with an allow-listed resolver only as an explicit opt-in.
 7. **Journal shape.** A `usd` perception would be journaled like any other, as
    `"[usd: <prim>] <description>"`. The `url` (file and prim path) is not journaled today
    (`core/consciousness.py` L953–L956). Should the journal gain structured perception fields
-   so out-of-process readers such as this exporter can see which prim was perceived?
+   so out-of-process readers such as this exporter can see which prim was perceived? Any
+   such change would also change what this repository reads and maps: today a perception
+   becomes `acsf:perception` and `acsf:perceptionSource` on the `Stimulus` prim
+   ([ARCHITECTURE.md § ACSF → USD mapping](../ARCHITECTURE.md#acsf--usd-mapping)). Even
+   without new fields, a `usd` perception would add `usd` to that attribute's token values.
+8. **Memory-path defence.** Stored perception text is replayed unsanitised into later
+   prompts for every source, Wikipedia included
+   ([Prompt-injection handling](#prompt-injection-handling)). Sanitising inside the provider
+   narrows that risk for scene text only. Should the defence also live in ACSF, in the
+   rendering of the short-term buffer? That is a decision for the ACSF maintainers.
 
 ## Not proposed
 
