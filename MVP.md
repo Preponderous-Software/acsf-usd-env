@@ -87,7 +87,7 @@ cycle; files are opened read-only.
 ### 3. Static snapshot stage
 Write `/World`, `/World/Instances/<name>` with `Identity`, `Mood` (final value; per-cycle
 samples come in milestone 4), `Attention`, `Workspace` prims from `state.json`; stage metadata
-(`defaultPrim`, `upAxis`, `metersPerUnit`, `customData`).
+(`defaultPrim`, `upAxis`, `metersPerUnit`, `customLayerData`).
 *Done when:* a stage built from a fixture `state.json` opens and every mapped field from the
 [mapping table](./ARCHITECTURE.md#acsf--usd-mapping) is present with the right type.
 

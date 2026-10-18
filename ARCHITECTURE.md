@@ -137,16 +137,18 @@ flowchart LR
 
 Stage metadata: `defaultPrim = "World"`, `upAxis = "Y"`, `metersPerUnit = 1`,
 `startTimeCode` = first cycle, `endTimeCode` = last cycle, `timeCodesPerSecond` = 1 by default
-(one cycle per second of playback; configurable). Stage `customData` records
-`acsf:sourceCommit` (if known), `acsf:exporterVersion`, `acsf:cycleIndexing`,
-`acsf:layout:synthetic = true`. All custom attributes use the `acsf:` namespace.
+(one cycle per second of playback; configurable). The stage's custom metadata (the root
+layer's `customLayerData`) records `acsf:sourceCommit` (if known), `acsf:exporterVersion`,
+`acsf:cycleIndexing`, `acsf:layout:synthetic = true`. All custom attributes use the `acsf:`
+namespace. Values listed as float are authored as USD `double`, so journal numbers survive
+unrounded.
 
 | ACSF source | USD prim path | Prim type | Attribute(s) | Time-sampled? |
 |---|---|---|---|---|
 | Stage root | `/World` | `Xform` | — | — |
-| Instance (directory name) | `/World/Instances/<name>` | `Xform` | `acsf:name` (string) | no |
-| `state.json identity.{origin_story, purpose, self_concept, values, personality_traits, amendments}` | `/World/Instances/<name>/Identity` | typeless | `acsf:identity:*` (string / string[]) | no (snapshot) |
-| `cycle.mood.<dim>` when present ([ACSF #220](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/issues/220)); otherwise `state.json identity.mood.<dim>` | `/World/Instances/<name>/Mood` | typeless | `acsf:mood:<dim>` (float) | yes when `cycle` events carry `mood`; otherwise **no** — final value only |
+| Instance (directory name; characters outside `[A-Za-z0-9_]` become `_` and a leading digit gets a `_` prefix) | `/World/Instances/<name>` | `Xform` | `acsf:name` (string; the unaltered directory name) | no |
+| `state.json identity.{origin_story, purpose, self_concept, values, personality_traits, amendments}` | `/World/Instances/<name>/Identity` | typeless | `acsf:identity:originStory`, `acsf:identity:purpose`, `acsf:identity:selfConcept` (string); `acsf:identity:values`, `acsf:identity:personalityTraits`, `acsf:identity:amendments` (string[]) | no (snapshot) |
+| `cycle.mood.<dim>` when present ([ACSF #220](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/issues/220)); otherwise `state.json identity.mood.<dim>` | `/World/Instances/<name>/Mood` | typeless | `acsf:mood:<dim>` (float; `<dim>` sanitised like a prim name, with `_2`, `_3` … when two dimensions sanitise alike — one mapping shared with `acsf:moodBaseline:<dim>`) | yes when `cycle` events carry `mood`; otherwise **no** — final value only |
 | `state.json identity.initial_mood.<dim>` | same | — | `acsf:moodBaseline:<dim>` (float) | no (snapshot) |
 | `cycle.attention.{focus, theme, salience}` (fallback: `state.json identity.attention_schema`) | `/World/Instances/<name>/Attention` | typeless | `acsf:focus` (token), `acsf:theme` (string), `acsf:salience` (float) | yes (when `cycle` events exist) |
 | `cycle.{metacognitive_label, prediction.error, reflection.effective, reflection.fired, short_term_size}`, `len(cycle.retrieved)` | `/World/Instances/<name>/Cycle` | typeless | `acsf:hot2Label` (token), `acsf:predictionError` (float), `acsf:reflectionP` (float), `acsf:reflectionFired` (bool), `acsf:workspaceSize` (int), `acsf:retrievedCount` (int; count only, never the summaries) | yes |
@@ -156,7 +158,7 @@ Stage metadata: `defaultPrim = "World"`, `upAxis = "Y"`, `metersPerUnit = 1`,
 | `utterance` event (`to`, `in_reply_to`) | `/World/Instances/<name>/Interlocutors/<sender>` | `Xform` + child `Cube` | `acsf:utterance`, `acsf:inReplyTo` (string), `visibility` | yes |
 | `identity_shift` event | `/World/Instances/<name>/Identity` | — | `acsf:selfConcept` (string) | yes |
 | `memory.long_term_count`, `consolidation.{long_term_total, stored}` | `/World/Instances/<name>/Memory` | typeless | `acsf:longTermCount` (int), `acsf:consolidationStored` (int) — counts only, no memory text | yes |
-| `state.json short_term[]` (`kind`, `content`, `timestamp`, `importance`, `seq`) | `/World/Instances/<name>/Workspace/Item_<seq>` | typeless | `acsf:kind` (token), `acsf:content` (string), `acsf:importance` (float) | no (final snapshot) |
+| `state.json short_term[]` (`kind`, `content`, `timestamp`, `importance`, `seq`) | `/World/Instances/<name>/Workspace/Item_<seq>` (`Item_<position>` for every item when any `seq` is missing or repeated — the golden runs' `state.json` files have none) | typeless | `acsf:kind` (token), `acsf:content` (string), `acsf:importance` (float), `acsf:timestamp` (string) | no (final snapshot) |
 | journal `timestamp` | `/World/Instances/<name>/Stream` | — | `acsf:timestamp` (string, ISO-8601) | yes |
 | Unknown event type `<t>` | `/World/Instances/<name>/Stream` | — | `acsf:event:<t>` (string, `content`) | yes |
 
@@ -237,7 +239,7 @@ Recorded 2026-10-17. Each entry resolves a question that was previously listed u
    upstream issue proposes adding the current `mood` to ACSF's per-cycle `cycle` event
    ([ACSF #220](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/issues/220)). The exporter does not depend on it: when `cycle` events carry
    `mood`, each `acsf:mood:<dim>` gets one time sample per such cycle and the stage
-   `customData` records `acsf:moodSampling = "journaled"` plus `acsf:moodFirstCycle` (the
+   `customLayerData` records `acsf:moodSampling = "journaled"` plus `acsf:moodFirstCycle` (the
    first cycle that carried it, since journals written before the change have none). When no
    `cycle` event carries `mood` — every journal written today, including the golden runs —
    mood is authored as the single final value from `state.json` and
