@@ -69,7 +69,8 @@ ACSF maintainers to accept or reject; nothing is filed or changed in ACSF by thi
 
 ```text
 acsf_usd/
-  reader/       ACSF artifact readers (journal.jsonl, state.json), typed records, cycle indexer
+  reader/       ACSF artifact readers (journal.jsonl, state.json), typed records, cycle indexer,
+                input resolution
   model.py      In-memory run model: Instance, Cycle, Event, Snapshot
   stage/        USD writers: static snapshot, time-sampled channels, schematic layout, composition
   follow.py     `--follow`: poll journal.jsonl from a byte offset, re-author the instance layer
@@ -84,13 +85,14 @@ tests/
 | `reader.journal` | Stream `journal.jsonl`; skip blank, corrupt and non-object lines with a warning, as ACSF's own reader does ([`persistence/journal.py` L49–L80](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/blob/64486d9c580325df33f03e8cb20dc7b8a227189a/consciousness-sim/persistence/journal.py#L49-L80)). Unknown event types are kept, not rejected. |
 | `reader.state` | Load `state.json` (a snapshot dict with `identity`, `short_term`, `thought_count`, optional `health`). A missing or invalid file yields "no snapshot", never an exception that aborts export. |
 | `reader.cycles` | Assign every journal event a cycle index (rules below). |
+| `reader.resolve` | Resolve each input argument to instance directories: an existing directory wins over a name under `CONSCIOUSNESS_HOME`; a directory with neither `journal.jsonl` nor `state.json` but with instance directories inside it is a collection standing for all of them. Duplicates (same resolved path) are dropped. |
 | `stage.snapshot` | Author non-time-varying data: identity, final mood, final attention schema, final workspace. |
 | `stage.channels` | Author time-sampled string/float/token attributes per event channel. |
 | `stage.layout` | Author the schematic geometry and per-cycle visibility. |
 | `stage.compose` | One layer per instance; a root layer that sublayers them for multi-instance views. |
 | `follow` | Live mode for one instance: incremental, read-only journal polling; atomic re-write of the output layer (see [Live mode](#live-mode-follow)). |
 | `validate` | Recompute, from the indexed journal and independently of the channel writer, what every text channel (`acsf:thought`, `acsf:reflection`, `acsf:perception`, each interlocutor's `acsf:utterance`) must hold on every cycle, and compare byte-for-byte; also check `acsf:cycleIndexing`. Works on `.usda`, `.usdc` and composed root stages. |
-| `cli` | Resolve input (instance name under `CONSCIOUSNESS_HOME`, an instance dir, a run dir, or a `CONSCIOUSNESS_HOME`), write `.usda` (default) or `.usdc` (`--binary`), validate. |
+| `cli` | Resolve input through `reader.resolve` (instance name under `CONSCIOUSNESS_HOME`, an instance dir, a run dir, or a `CONSCIOUSNESS_HOME`), refuse an output path inside any input, write `.usda` (default) or `.usdc` (`--binary`), validate. |
 
 ### Cycle indexing rules
 
@@ -158,10 +160,10 @@ unrounded.
 | `thought` event | `/World/Instances/<name>/Stream` | typeless | `acsf:thought` (string) | yes (held) |
 | `reflection` event | same | — | `acsf:reflection` (string; empty when none this cycle) | yes |
 | `perception` event (incl. `speech`) | `/World/Instances/<name>/Stimulus` | `Xform` + child `Sphere` | `acsf:perception` (string), `acsf:perceptionSource` (token: `wikipedia`/`mock`/`speech`), `visibility` | yes |
-| `utterance` event (`to`, `in_reply_to`) | `/World/Instances/<name>/Interlocutors/<sender>` (`<sender>` = the utterance's `to`, the person whose message was answered) | `Xform` + child `Cube` | `acsf:sender` (string, unaltered name; not sampled), `acsf:utterance`, `acsf:inReplyTo` (string), `visibility` | yes |
+| `utterance` event (`to`, `in_reply_to`) | `/World/Instances/<name>/Interlocutors/<sender>` (`<sender>` = the utterance's `to`, the person whose message was answered; `unknown` when `to` is missing or empty) | `Xform` + child `Cube` | `acsf:sender` (string, unaltered name; not sampled), `acsf:utterance`, `acsf:inReplyTo` (string), `visibility` | yes |
 | `identity_shift` event | `/World/Instances/<name>/Identity` | — | `acsf:selfConcept` (string) | yes |
 | `memory.long_term_count`, `consolidation.{long_term_total, stored}` | `/World/Instances/<name>/Memory` | typeless | `acsf:longTermCount` (int; the latest `long_term_count` / `long_term_total` in the cycle), `acsf:consolidationStored` (int; stored in that cycle, 0 when none) — counts only, no memory text | yes |
-| `state.json short_term[]` (`kind`, `content`, `timestamp`, `importance`, `seq`) | `/World/Instances/<name>/Workspace/Item_<seq>` (`Item_<position>` for every item when any `seq` is missing or repeated — the golden runs' `state.json` files have none) | typeless | `acsf:kind` (token), `acsf:content` (string), `acsf:importance` (float), `acsf:timestamp` (string) | no (final snapshot) |
+| `state.json short_term[]` (`kind`, `content`, `timestamp`, `importance`, `seq`) | `/World/Instances/<name>/Workspace/Item_<seq>` (`Item_<position>` for every item when any `seq` is missing, negative or repeated — the golden runs' `state.json` files have none) | typeless | `acsf:kind` (token), `acsf:content` (string), `acsf:importance` (float), `acsf:timestamp` (string) | no (final snapshot) |
 | journal `timestamp` | `/World/Instances/<name>/Stream` | — | `acsf:timestamp` (string, ISO-8601) | yes |
 | Unknown event type `<t>` | `/World/Instances/<name>/Stream` | — | `acsf:event:<t>` (string, `content`; `<t>` sanitised and disambiguated like interlocutor names) | yes |
 
@@ -177,7 +179,8 @@ carry them; `acsf:selfConcept` additionally holds `""` on the first cycle when t
 events of one channel in one cycle are joined with a newline. `acsf:timestamp` is the cycle's
 `thought` time (else its first event's). `acsf:perceptionSource` is the `<source>` in the
 `"[<source>: <title>] …"` prefix ACSF writes into a perception's `content`
-([`core/consciousness.py` L954–L956](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/blob/64486d9c580325df33f03e8cb20dc7b8a227189a/consciousness-sim/core/consciousness.py#L954-L956)).
+([`core/consciousness.py` L954–L956](https://github.com/Preponderous-Software/artificial-consciousness-simulation-framework/blob/64486d9c580325df33f03e8cb20dc7b8a227189a/consciousness-sim/core/consciousness.py#L954-L956)),
+taken from the cycle's last perception, or `""` when the content has no such prefix.
 Interlocutor prim names are sanitised like instance names, disambiguated deterministically
 (`_2`, `_3`, … in sorted order of the raw names).
 
@@ -207,8 +210,8 @@ belongs to the group:
 - `startTimeCode` / `endTimeCode` spanning every instance, so all of them share one timeline;
 - `timeCodesPerSecond`, `defaultPrim`, `upAxis`, `metersPerUnit`;
 - an `over` per instance translating it `10 × i` along X (part of the synthetic layout);
-- `customLayerData` with `acsf:exporterVersion`, `acsf:layout:synthetic = true` and
-  `acsf:instanceCount`.
+- `customLayerData` with `acsf:exporterVersion`, `acsf:layout:synthetic = true`,
+  `acsf:instanceCount`, and `acsf:sourceCommit` when `--source-commit` is given.
 
 Per-instance `acsf:cycleIndexing` and `acsf:moodSampling` stay in each instance layer.
 
@@ -279,7 +282,13 @@ composition stays batch-only.
   to a temporary instance while `--follow` runs, asserts the output gains samples, and asserts
   the final output equals a batch export of the same files; the instance directory gains no
   files other than the test's own writes.
-- **CI:** GitHub Actions, Python 3.11 and 3.13, `pytest`, `mypy`, `ruff`. No network; no LLM.
+- **CI:** GitHub Actions, Python 3.11 and 3.13, `pytest`, `mypy`, `ruff`, then an
+  end-to-end `acsf-usd export` + `acsf-usd validate` of the golden runs (`.usda` and
+  `--binary`). A separate workflow exports the golden runs (one instance, all instances,
+  binary) and checks every written layer with
+  [usd-asset-gate](https://github.com/Preponderous-Software/usd-asset-gate) at a pinned commit,
+  using the rules in `.usd-asset-gate.yml` (`metersPerUnit: 1`, `upAxis: Y`, a 10 MB per-file
+  limit, `fail_on: warning`). No network in tests; no LLM.
 
 ## Decisions
 
