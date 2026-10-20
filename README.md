@@ -105,7 +105,11 @@ mypy            # strict; configured in pyproject.toml
 pytest
 ```
 
-CI runs the same commands on Python 3.11 and 3.13. Tests use no network and no LLM.
+CI runs the same commands on Python 3.11 and 3.13, then exports the bundled golden runs
+(`tests/fixtures/golden`) and checks the result with `acsf-usd validate`. A second workflow
+exports the same runs and checks every written layer with
+[usd-asset-gate](https://github.com/Preponderous-Software/usd-asset-gate), pinned to a commit and
+configured in [`.usd-asset-gate.yml`](./.usd-asset-gate.yml). Tests use no network and no LLM.
 
 ## License
 
