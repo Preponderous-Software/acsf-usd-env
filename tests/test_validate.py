@@ -51,8 +51,7 @@ def test_long_mismatching_values_are_truncated_in_the_report() -> None:
     stage.GetPrimAtPath(f"{NOVA}/Stream").GetAttribute("acsf:thought").Set("x" * 100, 1)
     report = validate_instance(stage, run, "Nova")
     assert report.problems == [
-        f"Stream.acsf:thought cycle 1: stage has '{'x' * 56}..., "
-        "journal has 'Nova thought one.'"
+        f"Stream.acsf:thought cycle 1: stage has '{'x' * 56}..., journal has 'Nova thought one.'"
     ]
 
 
