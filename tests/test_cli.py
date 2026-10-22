@@ -53,9 +53,7 @@ def test_describe_journal_only_instance_warns_on_stderr(
     lines = captured.out.splitlines()
     assert "  mood: final value only" in lines
     assert "  snapshot: none" in lines
-    assert (
-        "acsf-usd: warning: state.json: not found; exporting without a snapshot" in captured.err
-    )
+    assert "acsf-usd: warning: state.json: not found; exporting without a snapshot" in captured.err
     assert "skipping corrupted line" in captured.err
     assert list(directory.iterdir()) == [directory / "journal.jsonl"]
 
