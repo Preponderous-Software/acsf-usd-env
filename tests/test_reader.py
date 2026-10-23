@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 
@@ -17,8 +19,10 @@ from acsf_usd.reader import (
     read_instance,
     read_journal,
     read_state,
+    resolve_inputs,
     resolve_instance_dir,
 )
+from acsf_usd.reader.resolve import consciousness_home
 from tests.conftest import INSTANCES
 
 
@@ -340,6 +344,76 @@ def test_resolve_errors(arg: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
 def test_resolve_directory_without_artifacts(tmp_path: Path) -> None:
     with pytest.raises(InputError, match="neither"):
         resolve_instance_dir(str(tmp_path))
+
+
+def test_resolve_existing_file_is_not_a_directory(tmp_path: Path) -> None:
+    path = tmp_path / "journal.jsonl"
+    path.write_bytes(b"")
+    with pytest.raises(InputError, match=": not a directory$"):
+        resolve_instance_dir(str(path))
+
+
+def test_existing_directory_wins_over_a_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    shutil.copytree(INSTANCES / "Ash", tmp_path / "Nova")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CONSCIOUSNESS_HOME", str(INSTANCES))
+    assert resolve_instance_dir("Nova") == Path("Nova")
+
+
+def test_a_path_with_a_separator_is_never_looked_up_by_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    home = tmp_path / "home"
+    shutil.copytree(INSTANCES / "Ash", home / "sub" / "Ash")
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(InputError, match="no such directory"):
+        resolve_instance_dir(os.path.join("sub", "Ash"), home=home)
+
+
+def test_a_name_under_home_without_artifacts_points_at_consciousness_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "home" / "Empty").mkdir(parents=True)
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(InputError, match="set CONSCIOUSNESS_HOME"):
+        resolve_instance_dir("Empty", home=tmp_path / "home")
+
+
+def test_consciousness_home_default_and_tilde_expansion(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("CONSCIOUSNESS_HOME", raising=False)
+    assert consciousness_home() == tmp_path / ".consciousness"
+    monkeypatch.setenv("CONSCIOUSNESS_HOME", "~/elsewhere")
+    assert consciousness_home() == tmp_path / "elsewhere"
+
+
+def test_collection_skips_files_and_non_instance_children(tmp_path: Path) -> None:
+    shutil.copytree(INSTANCES / "Ash", tmp_path / "run" / "replicate-1")
+    (tmp_path / "run" / "logs").mkdir()
+    (tmp_path / "run" / "journal.txt").write_text("not an instance\n")
+    directories, collection = resolve_inputs([str(tmp_path / "run")])
+    assert collection and directories == [tmp_path / "run" / "replicate-1"]
+
+
+def test_resolve_inputs_dedupes_across_a_collection_and_a_path() -> None:
+    directories, collection = resolve_inputs([str(INSTANCES / "Nova"), str(INSTANCES)])
+    assert collection
+    assert directories == [INSTANCES / "Nova", INSTANCES / "Ash", INSTANCES / "Lumen"]
+
+
+def test_read_instance_name_override_and_missing_state_warning(
+    instance_copy: Callable[[str], Path],
+) -> None:
+    directory = instance_copy("Ash")
+    (directory / "state.json").unlink()
+    run = read_instance(directory, name="Renamed")
+    assert run.name == "Renamed" and run.source_dir == directory
+    assert run.snapshot is None
+    assert "state.json: not found; exporting without a snapshot" in run.warnings
 
 
 def test_read_instance_builds_run_model() -> None:
