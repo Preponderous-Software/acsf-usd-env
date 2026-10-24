@@ -1,9 +1,16 @@
-"""A small ``ctypes`` binding of the slice of Strata's C ABI (``strata.h``) the viewer uses.
+"""The viewer's side of Strata: plain draw records and a thin engine over the official binding.
 
-Strata ships no Python binding yet, so this module declares the slice of ``strata.h`` the viewer
-uses. Every struct is checked against the library's own ``strata_struct_size`` when the library
-is loaded, the same guard Strata's C# binding uses, so a layout drift is reported as a clear
-error instead of a crash. Nothing here is specific to ACSF.
+Strata's C ABI (``strata.h``) is reached through Strata's official Python binding (the
+``strata-engine`` package, ``bindings/python`` in the Strata repository, installed by the
+``[view]`` extra and pinned to the release ``strata.lock`` names). The binding declares every
+function and struct, and checks the ABI major version and every struct layout against the loaded
+library, so a layout drift is reported as a clear error instead of a crash.
+
+This module keeps what the viewer itself needs: frozen draw records (:class:`Prim`,
+:class:`Line`, :class:`Glow`, :class:`Label`, :class:`Panel`) that the scene builder produces
+without touching ``ctypes``, and an :class:`Engine` that turns them into the binding's structs.
+The binding is imported only when a library is loaded, so ``acsf-usd export`` and the scene
+tests never import it. Nothing here is specific to ACSF.
 
 The library itself is never bundled: :mod:`acsf_usd.view.fetch` downloads the release asset
 pinned in ``strata.lock`` and checks its SHA-256 first.
@@ -11,7 +18,6 @@ pinned in ``strata.lock`` and checks its SHA-256 first.
 
 from __future__ import annotations
 
-import ctypes as C
 import sys
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
@@ -20,24 +26,12 @@ from typing import Any
 
 ABI_MAJOR = 1
 ABI_MINOR_REQUIRED = 5  # line, point and text overlays
+ABI_MINOR_RECTS = 11  # filled screen rectangles (the text panel's backing)
 
-SURFACE_WINDOW = 0
-SURFACE_HEADLESS = 1
-
-FLAG_VSYNC = 1 << 0
-FLAG_HIDDEN_WINDOW = 1 << 2
-
+# strata.h enum values the scene builder and the input handling use (stable within ABI 1.x).
 PRIMITIVE_CUBE = 0
 PRIMITIVE_CYLINDER = 2
 PRIMITIVE_SPHERE = 3
-
-LIGHTING_LEGACY = 0
-
-CLEAR_COLOR = 1 << 0
-CLEAR_DEPTH = 1 << 1
-
-POINT_SOFT = 0x1
-TEXT_SHADOW = 0x1
 
 EVENT_QUIT = 1
 EVENT_KEY_DOWN = 2
@@ -51,185 +45,51 @@ EVENT_RESIZED = 8
 Vec3 = tuple[float, float, float]
 RGBA = tuple[float, float, float, float]
 
-F3 = C.c_float * 3
-F4 = C.c_float * 4
-F16 = C.c_float * 16
-
-
-class RenderItem(C.Structure):
-    _fields_ = [("kind", C.c_int32), ("position", F3), ("scale", F3), ("color", F4)]
-
-
-class EngineDesc(C.Structure):
-    _fields_ = [
-        ("struct_size", C.c_uint32),
-        ("abi_version", C.c_uint32),
-        ("surface", C.c_int32),
-        ("width", C.c_int32),
-        ("height", C.c_int32),
-        ("flags", C.c_uint32),
-        ("title", C.c_char_p),
-        ("get_proc_address", C.c_void_p),
-        ("get_proc_address_user", C.c_void_p),
-    ]
-
-
-class Camera(C.Structure):
-    _fields_ = [
-        ("view", F16),
-        ("projection", F16),
-        ("eye", F3),
-        ("near_plane", C.c_float),
-        ("far_plane", C.c_float),
-    ]
-
-
-class Lighting(C.Structure):
-    _fields_ = [
-        ("mode", C.c_int32),
-        ("legacy_direction", F3),
-        ("legacy_ambient", C.c_float),
-        ("time_of_day", C.c_float),
-        ("latitude_degrees", C.c_float),
-        ("cascade_count", C.c_int32),
-        ("shadow_map_size", C.c_int32),
-        ("shadow_distance", C.c_float),
-        ("split_lambda", C.c_float),
-        ("fog", C.c_int32),
-    ]
-
-
-class FrameDesc(C.Structure):
-    _fields_ = [("clear_flags", C.c_uint32), ("clear_color", F4)]
-
-
-class Event(C.Structure):
-    _fields_ = [
-        ("type", C.c_int32),
-        ("scancode", C.c_int32),
-        ("modifiers", C.c_int32),
-        ("repeat", C.c_int32),
-        ("button", C.c_int32),
-        ("width", C.c_int32),
-        ("height", C.c_int32),
-        ("x", C.c_float),
-        ("y", C.c_float),
-        ("dx", C.c_float),
-        ("dy", C.c_float),
-        ("text", C.c_char * 32),
-    ]
-
-
-class LineVertex(C.Structure):
-    _fields_ = [("position", F3), ("color", F4)]
-
-
-class Point(C.Structure):
-    _fields_ = [
-        ("position", F3),
-        ("size_pixels", C.c_float),
-        ("world_diameter", C.c_float),
-        ("color", F4),
-        ("flags", C.c_uint32),
-    ]
-
-
-class Text(C.Structure):
-    _fields_ = [
-        ("x", C.c_float),
-        ("y", C.c_float),
-        ("pixel_size", C.c_float),
-        ("flags", C.c_uint32),
-        ("color", F4),
-        ("utf8", C.c_char_p),
-    ]
-
-
-# STRATA_STRUCT_* ids from strata.h, checked at load.
-STRUCT_IDS: dict[int, type[C.Structure]] = {
-    0: RenderItem,
-    1: EngineDesc,
-    2: Camera,
-    3: Lighting,
-    4: FrameDesc,
-    6: Event,
-    10: LineVertex,
-    11: Point,
-    12: Text,
-}
-
-_P = C.c_void_p
-_I = C.c_int32
-_S = C.c_int32  # StrataStatus
-_SIGNATURES: dict[str, tuple[Any, list[Any]]] = {
-    "strata_abi_version": (C.c_uint32, []),
-    "strata_abi_minor": (C.c_uint32, []),
-    "strata_version_string": (C.c_char_p, []),
-    "strata_struct_size": (_I, [_I]),
-    "strata_last_error": (C.c_char_p, []),
-    "strata_create": (_S, [_P, C.POINTER(_P)]),
-    "strata_destroy": (None, [_P]),
-    "strata_gpu_description": (C.c_char_p, [_P]),
-    "strata_poll_event": (_I, [_P, _P]),
-    "strata_get_drawable_size": (_S, [_P, C.POINTER(_I), C.POINTER(_I)]),
-    "strata_set_camera": (_S, [_P, _P]),
-    "strata_lighting_defaults": (_S, [_I, _P]),
-    "strata_set_lighting": (_S, [_P, _P]),
-    "strata_begin_frame": (_S, [_P, _P]),
-    "strata_submit_primitives": (_S, [_P, _P, _I]),
-    "strata_submit_lines": (_S, [_P, _P, _I]),
-    "strata_submit_points": (_S, [_P, _P, _I]),
-    "strata_submit_text": (_S, [_P, _P, _I]),
-    "strata_end_frame": (_S, [_P]),
-    "strata_present": (_S, [_P]),
-    "strata_read_pixels_rgba8": (_S, [_P, _P, _I, C.POINTER(_I), C.POINTER(_I)]),
-    "strata_save_screenshot_png": (_S, [_P, C.c_char_p]),
-}
-
 
 class StrataError(Exception):
     """A Strata call failed, or the library cannot be used."""
 
 
 class StrataUnavailable(StrataError):
-    """The library is missing, does not load, or is too old for the viewer."""
+    """The binding or library is missing, does not load, or is too old for the viewer."""
+
+
+def _binding() -> Any:
+    try:
+        import strata
+    except ImportError:
+        raise StrataUnavailable(
+            "the Strata Python binding is not installed: pip install 'acsf-usd-env[view]'"
+        ) from None
+    return strata
 
 
 class Library:
-    """A loaded, checked ``libstrata``."""
+    """A loaded ``libstrata``, checked by the official binding."""
 
     def __init__(self, path: Path) -> None:
+        strata = _binding()
         try:
-            self.dll: Any = C.CDLL(str(path))
-        except OSError as exc:
-            raise StrataUnavailable(f"cannot load {path}: {exc}") from None
-        for name, (restype, argtypes) in _SIGNATURES.items():
-            try:
-                fn = getattr(self.dll, name)
-            except AttributeError:
-                raise StrataUnavailable(f"{path} has no {name}: not a Strata library") from None
-            fn.restype = restype
-            fn.argtypes = argtypes
-        major, minor = int(self.dll.strata_abi_version()), int(self.dll.strata_abi_minor())
-        if major != ABI_MAJOR or minor < ABI_MINOR_REQUIRED:
+            self.binding: Any = strata.load(path)
+        except strata.StrataLoadError as exc:
+            raise StrataUnavailable(str(exc)) from None
+        except strata.StrataAbiError as exc:
+            raise StrataUnavailable(f"{path}: {exc}") from None
+        major, minor = int(self.binding.abi_version), int(self.binding.abi_minor)
+        if minor < ABI_MINOR_REQUIRED:
             raise StrataUnavailable(
                 f"{path} has Strata ABI {major}.{minor}; the viewer needs "
                 f"{ABI_MAJOR}.{ABI_MINOR_REQUIRED} or a later {ABI_MAJOR}.x"
             )
-        for struct_id, cls in STRUCT_IDS.items():
-            size = int(self.dll.strata_struct_size(struct_id))
-            if size != C.sizeof(cls):
-                raise StrataUnavailable(
-                    f"{path}: {cls.__name__} is {size} bytes in the library but "
-                    f"{C.sizeof(cls)} in this binding (ABI drift)"
-                )
+        self.module = strata
+        self.dll: Any = self.binding.raw
         self.path = path
         self.abi = (major, minor)
-        self.version = (self.dll.strata_version_string() or b"?").decode()
+        self.version = str(self.binding.version)
+        self.has_rects = bool(self.binding.has("strata_submit_rects"))
 
     def last_error(self) -> str:
-        msg = self.dll.strata_last_error()
-        return msg.decode(errors="replace") if msg else ""
+        return str(self.binding.last_error())
 
 
 @dataclass(frozen=True)
@@ -268,6 +128,17 @@ class Label:
 
 
 @dataclass(frozen=True)
+class Panel:
+    """A filled, alpha-blended screen rectangle drawn after the scene and before any text."""
+
+    x: float
+    y: float
+    width: float
+    height: float
+    color: RGBA
+
+
+@dataclass(frozen=True)
 class InputEvent:
     type: int
     scancode: int = 0
@@ -287,6 +158,11 @@ def ascii_bytes(text: str) -> bytes:
     return "".join(ch if 32 <= ord(ch) < 127 else "?" for ch in text).encode("ascii")
 
 
+def _set(arr: Any, values: Sequence[float]) -> None:
+    for i, v in enumerate(values):
+        arr[i] = v
+
+
 class Engine:
     """One Strata engine: a window, or a headless offscreen target."""
 
@@ -301,32 +177,27 @@ class Engine:
         vsync: bool = True,
     ) -> None:
         self.lib = lib
-        self._dll = lib.dll
-        surface, flags = SURFACE_WINDOW, 0
+        s = self._s = lib.module
+        surface, flags = s.SURFACE_WINDOW, 0
         if headless:
             # Windows has no EGL: a hidden SDL3 window stands in for the headless surface.
             if sys.platform == "win32":
-                flags |= FLAG_HIDDEN_WINDOW
+                flags |= s.FLAG_HIDDEN_WINDOW
             else:
-                surface = SURFACE_HEADLESS
+                surface = s.SURFACE_HEADLESS
         elif vsync:
-            flags |= FLAG_VSYNC
-        self._title = title.encode()
-        desc = EngineDesc(
-            C.sizeof(EngineDesc), ABI_MAJOR, surface, width, height, flags, self._title, None, None
-        )
-        handle = C.c_void_p()
-        status = self._dll.strata_create(C.byref(desc), C.byref(handle))
-        if status != 0 or not handle.value:
-            raise StrataUnavailable(f"strata_create failed ({status}): {lib.last_error()}")
-        self._handle: C.c_void_p | None = handle
+            flags |= s.FLAG_VSYNC
+        try:
+            self._engine: Any = s.Engine(
+                lib.binding, width, height, surface=surface, flags=flags, title=title
+            )
+        except s.StrataError as exc:
+            raise StrataUnavailable(f"strata_create failed: {exc}") from None
 
     # -- lifecycle -----------------------------------------------------------------------------
 
     def close(self) -> None:
-        if self._handle is not None:
-            self._dll.strata_destroy(self._handle)
-            self._handle = None
+        self._engine.close()
 
     def __enter__(self) -> Engine:
         return self
@@ -334,120 +205,118 @@ class Engine:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
-    @property
-    def handle(self) -> C.c_void_p:
-        if self._handle is None:
-            raise StrataError("engine is closed")
-        return self._handle
-
-    def _ok(self, status: int, what: str) -> None:
-        if status != 0:
-            raise StrataError(f"{what} failed ({status}): {self.lib.last_error()}")
+    def _call(self, fn: Any, *args: Any) -> Any:
+        try:
+            return fn(*args)
+        except self._s.StrataError as exc:
+            raise StrataError(str(exc)) from None
 
     def gpu_description(self) -> str:
-        desc = self._dll.strata_gpu_description(self.handle)
-        return desc.decode(errors="replace") if desc else ""
+        return str(self._call(self._engine.gpu_description))
 
     def drawable_size(self) -> tuple[int, int]:
-        w, h = C.c_int32(), C.c_int32()
-        self._ok(
-            self._dll.strata_get_drawable_size(self.handle, C.byref(w), C.byref(h)),
-            "get_drawable_size",
-        )
-        return int(w.value), int(h.value)
+        w, h = self._call(self._engine.drawable_size)
+        return int(w), int(h)
 
     # -- state ---------------------------------------------------------------------------------
 
     def set_camera(
         self, view: Sequence[float], projection: Sequence[float], eye: Vec3, near: float, far: float
     ) -> None:
-        cam = Camera(F16(*view), F16(*projection), F3(*eye), near, far)
-        self._ok(self._dll.strata_set_camera(self.handle, C.byref(cam)), "set_camera")
+        cam = self._s.Camera()
+        _set(cam.view, view)
+        _set(cam.projection, projection)
+        _set(cam.eye, eye)
+        cam.near_plane, cam.far_plane = near, far
+        self._call(self._engine.set_camera, cam)
 
     def set_legacy_lighting(self, direction: Vec3, ambient: float) -> None:
-        light = Lighting()
-        self._ok(self._dll.strata_lighting_defaults(LIGHTING_LEGACY, C.byref(light)), "lighting")
-        light.legacy_direction = F3(*direction)
+        light = self._call(self.lib.binding.lighting_defaults, self._s.LIGHTING_LEGACY)
+        _set(light.legacy_direction, direction)
         light.legacy_ambient = ambient
-        self._ok(self._dll.strata_set_lighting(self.handle, C.byref(light)), "set_lighting")
+        self._call(self._engine.set_lighting, light)
 
     # -- frames --------------------------------------------------------------------------------
 
     def begin_frame(self, clear: RGBA) -> None:
-        desc = FrameDesc(CLEAR_COLOR | CLEAR_DEPTH, F4(*clear))
-        self._ok(self._dll.strata_begin_frame(self.handle, C.byref(desc)), "begin_frame")
+        self._call(self._engine.begin_frame, clear)
 
     def submit_primitives(self, prims: Sequence[Prim]) -> None:
         if not prims:
             return
-        arr = (RenderItem * len(prims))(
-            *(RenderItem(p.kind, F3(*p.position), F3(*p.scale), F4(*p.color)) for p in prims)
-        )
-        self._ok(self._dll.strata_submit_primitives(self.handle, arr, len(prims)), "primitives")
+        s = self._s
+        arr = (s.RenderItem * len(prims))()
+        for item, p in zip(arr, prims, strict=True):
+            item.kind = p.kind
+            _set(item.position, p.position)
+            _set(item.scale, p.scale)
+            _set(item.color, p.color)
+        self._call(self._engine.submit_primitives, arr)
 
     def submit_lines(self, lines: Sequence[Line]) -> None:
         if not lines:
             return
-        arr = (LineVertex * (2 * len(lines)))()
+        arr = (self._s.LineVertex * (2 * len(lines)))()
         for i, ln in enumerate(lines):
-            arr[2 * i] = LineVertex(F3(*ln.a), F4(*ln.color))
-            arr[2 * i + 1] = LineVertex(F3(*ln.b), F4(*(ln.color_b or ln.color)))
-        self._ok(self._dll.strata_submit_lines(self.handle, arr, len(arr)), "lines")
+            _set(arr[2 * i].position, ln.a)
+            _set(arr[2 * i].color, ln.color)
+            _set(arr[2 * i + 1].position, ln.b)
+            _set(arr[2 * i + 1].color, ln.color_b or ln.color)
+        self._call(self._engine.submit_lines, arr)
 
     def submit_points(self, points: Sequence[Glow]) -> None:
         if not points:
             return
-        arr = (Point * len(points))(
-            *(
-                Point(
-                    F3(*p.position),
-                    p.size_pixels,
-                    p.world_diameter,
-                    F4(*p.color),
-                    POINT_SOFT if p.soft else 0,
-                )
-                for p in points
-            )
-        )
-        self._ok(self._dll.strata_submit_points(self.handle, arr, len(points)), "points")
+        s = self._s
+        arr = (s.Point * len(points))()
+        for pt, p in zip(arr, points, strict=True):
+            _set(pt.position, p.position)
+            pt.size_pixels = p.size_pixels
+            pt.world_diameter = p.world_diameter
+            _set(pt.color, p.color)
+            pt.flags = s.POINT_SOFT if p.soft else 0
+        self._call(self._engine.submit_points, arr)
+
+    def submit_panels(self, panels: Sequence[Panel]) -> None:
+        """Filled rectangles (ABI 1.11); skipped on an older library, which draws text bare."""
+        if not panels or not self.lib.has_rects:
+            return
+        arr = (self._s.Rect * len(panels))()
+        for r, p in zip(arr, panels, strict=True):
+            r.x, r.y, r.width, r.height = p.x, p.y, p.width, p.height
+            _set(r.color, p.color)
+        self._call(self._engine.submit_rects, arr)
 
     def submit_text(self, labels: Sequence[Label]) -> None:
         if not labels:
             return
+        s = self._s
         keep = [ascii_bytes(lb.text) for lb in labels]  # alive until the call returns
-        arr = (Text * len(labels))(
-            *(
-                Text(lb.x, lb.y, lb.size, TEXT_SHADOW if lb.shadow else 0, F4(*lb.color), raw)
-                for lb, raw in zip(labels, keep, strict=True)
-            )
-        )
-        self._ok(self._dll.strata_submit_text(self.handle, arr, len(labels)), "text")
+        arr = (s.Text * len(labels))()
+        for t, lb, raw in zip(arr, labels, keep, strict=True):
+            t.x, t.y, t.pixel_size = lb.x, lb.y, lb.size
+            t.flags = s.TEXT_SHADOW if lb.shadow else 0
+            _set(t.color, lb.color)
+            t.utf8 = raw
+        self._call(self._engine.submit_text, arr)
+        del keep
 
     def end_frame(self) -> None:
-        self._ok(self._dll.strata_end_frame(self.handle), "end_frame")
+        self._call(self._engine.end_frame)
 
     def present(self) -> None:
-        self._ok(self._dll.strata_present(self.handle), "present")
+        self._call(self._engine.present)
 
     def read_pixels(self) -> tuple[int, int, bytes]:
         """The last frame as tightly packed RGBA8, top row first."""
-        w, h = self.drawable_size()
-        buf = (C.c_uint8 * (w * h * 4))()
-        ow, oh = C.c_int32(), C.c_int32()
-        self._ok(
-            self._dll.strata_read_pixels_rgba8(
-                self.handle, buf, len(buf), C.byref(ow), C.byref(oh)
-            ),
-            "read_pixels",
-        )
-        return int(ow.value), int(oh.value), bytes(buf)[: ow.value * oh.value * 4]
+        data, w, h = self._call(self._engine.read_pixels)
+        return int(w), int(h), bytes(data)
 
     def save_png(self, path: Path) -> None:
-        self._ok(self._dll.strata_save_screenshot_png(self.handle, str(path).encode()), "save_png")
+        self._call(self._engine.save_screenshot_png, path)
 
     def poll_events(self) -> Iterator[InputEvent]:
-        ev = Event()
-        while self._dll.strata_poll_event(self.handle, C.byref(ev)):
+        while (ev := self._call(self._engine.poll_event)) is not None:
             yield InputEvent(
                 type=int(ev.type),
                 scancode=int(ev.scancode),

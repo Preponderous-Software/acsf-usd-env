@@ -141,9 +141,11 @@ first/last, `[`/`]` speed, left-drag orbit, wheel zoom, click a node to jump to 
 next instance, `T` cycle the panel (thought, reflection, perception, reply), `F` follow the
 newest cycle, `R` reset the camera, Esc/Q quit.
 
-**Strata.** The `[view]` extra does not bundle the native library: `acsf-usd fetch-strata`
+**Strata.** The `[view]` extra installs Strata's official Python binding (`strata-engine`,
+pinned to the Strata `v0.5.0` tag; it is not on PyPI, so pip fetches the tag's source archive)
+but does not bundle the native library: `acsf-usd fetch-strata`
 downloads the release asset pinned in [`acsf_usd/view/strata.lock`](./acsf_usd/view/strata.lock)
-(Strata v0.4.0, Linux x64 or Windows x64) into a per-user cache, checks it against the pinned
+(Strata v0.5.0, Linux x64 or Windows x64) into a per-user cache, checks it against the pinned
 SHA-256 and deletes it on a mismatch. `ACSF_USD_STRATA_LIB` points at a local build instead.
 Strata needs OpenGL 4.5; on a machine without a GPU, Mesa's llvmpipe works
 (`LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe`), headless through EGL. If the library is

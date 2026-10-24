@@ -153,3 +153,16 @@ def test_replies_and_per_cycle_channels(view_stages: dict[str, Path]) -> None:
     assert "to " + nova.interlocutors[0].sender in text or "to Dana" in text
     assert "mood (per cycle)" in text  # Lumen journaled mood per cycle
     assert "Lumen" in text and "Nova" in text
+
+
+def test_text_panel_has_one_backing_behind_its_text(echo) -> None:  # type: ignore[no-untyped-def]
+    frame = build_frame(echo, Layout.of(echo), ViewState(cycle=116), frame_camera(echo), W, H)
+    (panel,) = frame.panels
+    assert 0 <= panel.x and panel.x + panel.width <= W
+    assert 0 <= panel.y and panel.y + panel.height <= H
+    assert panel.color[3] < 1.0  # alpha blended over the scene
+    heading = next(lb for lb in frame.labels if lb.text.startswith("thought at cycle 116"))
+    below = [lb for lb in frame.labels if lb.y >= heading.y]
+    assert below and all(
+        panel.x <= lb.x and panel.y <= lb.y < panel.y + panel.height for lb in below
+    )

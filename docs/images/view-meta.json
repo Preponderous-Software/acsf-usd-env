@@ -2,10 +2,10 @@
   "what": "acsf-usd view (Strata) on the Echo golden run, cycles 1-200, and all four runs",
   "caption": "synthetic schematic layout - not a body or a place",
   "strata": {
-    "version": "0.4.0",
+    "version": "0.5.0",
     "abi": [
       1,
-      8
+      11
     ],
     "gpu": "llvmpipe (LLVM 12.0.0, 256 bits) | 4.5 (Core Profile) Mesa 21.2.6"
   },
@@ -20,14 +20,14 @@
     "orbit_degrees": 0.0
   },
   "timings": {
-    "export_s": 1.52,
+    "export_s": 1.49,
     "gif_frames": 131,
-    "gif_render_s": 27.4,
-    "encode_s": 3.7
+    "gif_render_s": 19.4,
+    "encode_s": 2.8
   },
   "sizes_bytes": {
-    "view-echo.gif": 2669590,
-    "view-echo-116.png": 177219,
-    "view-golden.png": 138112
+    "view-echo.gif": 2831541,
+    "view-echo-116.png": 177298,
+    "view-golden.png": 138127
   }
 }
