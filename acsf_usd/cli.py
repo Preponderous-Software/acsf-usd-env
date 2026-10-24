@@ -114,6 +114,12 @@ def build_parser() -> argparse.ArgumentParser:
         description="Print what an export of the input(s) would contain. Writes nothing.",
     )
     describe.add_argument("inputs", nargs="+", metavar="input", help="as for export")
+
+    # `view` and `fetch-strata` (the optional [view] extra) live in acsf_usd.view; nothing is
+    # loaded from Strata unless one of them runs.
+    from acsf_usd.view.cli import add_parsers
+
+    add_parsers(commands)
     return parser
 
 
@@ -263,6 +269,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             return run_validate(args)
         if args.command == "describe":
             return run_describe(args)
+        if args.command == "view":
+            from acsf_usd.view.cli import run_view
+
+            return run_view(args)
+        if args.command == "fetch-strata":
+            from acsf_usd.view.cli import run_fetch
+
+            return run_fetch(args)
     except UsageError as exc:
         parser.exit(2, f"acsf-usd: error: {exc}\n")
     except (InputError, OSError) as exc:

@@ -27,11 +27,12 @@ Requires Python 3.11 or newer.
 
 ```bash
 pip install .            # installs the package and the `acsf-usd` command
-pip install ".[dev]"     # plus pytest, mypy and ruff for development
+pip install ".[dev]"     # plus pytest, mypy, ruff and Pillow for development
+pip install ".[view]"    # the optional 3D viewer (see "View a stage in 3D" below)
 acsf-usd --version
 ```
 
-The only runtime dependency is [`usd-core`](https://pypi.org/project/usd-core/), pinned to `26.8`, which provides the `pxr` Python bindings. It does **not** ship `usdview` or any imaging plugins, so viewing a stage needs a full OpenUSD build or another USD-capable tool.
+The only runtime dependency is [`usd-core`](https://pypi.org/project/usd-core/), pinned to `26.8`, which provides the `pxr` Python bindings. It does **not** ship `usdview` or any imaging plugins, so viewing a stage in a general USD tool needs a full OpenUSD build; [`acsf-usd view`](#view-a-stage-in-3d-strata) draws one with Strata instead.
 
 ## Usage
 
@@ -97,6 +98,61 @@ ACSF knows, the instance has no body or location, and nothing in the stage feeds
 ACSF. Every stage records `acsf:layout:synthetic = true`, and each geometry prim's
 documentation says the same.
 
+## View a stage in 3D (Strata)
+
+![acsf-usd view drawing the Echo golden run: thought nodes fill a spiral cycle by cycle, with perception pulses, reflection rings, mood gauges and the thought text](./docs/images/view-echo.gif)
+
+*`acsf-usd view` on the Echo golden run's exported stage, drawn headless with [Strata](https://github.com/Preponderous-Software/strata) from the stage's own time samples ([`scripts/render_view.py`](./scripts/render_view.py)): the spiral fills in cycle order, the `Stimulus` sphere lights and sends a pulse on perception cycles, reflections get an amber ring, the bars are the final mood values against their baselines, and the bottom panel is the cycle's thought. Synthetic schematic layout, not a body or a place.*
+
+`acsf-usd view` opens a stage written by `acsf-usd export` (one instance or a multi-instance
+root) and draws it with Strata, the Preponderous 3D engine, through its C ABI. It reads the
+stage only — never an instance directory, so memory text and embeddings, which the exporter
+leaves out, are never within reach. It is an optional extra; the exporter commands never load
+Strata.
+
+```bash
+pip install ".[view]"
+acsf-usd fetch-strata                                   # once: downloads the pinned libstrata, checks its SHA-256
+acsf-usd view echo.usda                                 # interactive window
+acsf-usd view echo.usda --png echo.png --cycle 116      # one headless frame (several --cycle: echo-<n>.png)
+acsf-usd export ~/.consciousness/Echo -o live.usda --follow &
+acsf-usd view live.usda --watch                         # follow a running instance
+```
+
+| | |
+|---|---|
+| ![Echo at cycle 116: the spiral two-thirds full, the Stimulus sphere lit with a pulse to the current node, the thought text below](./docs/images/view-echo-116.png) | ![All four golden runs on one shared timeline at cycle 120, one spiral each, Wren's text in the panel](./docs/images/view-golden.png) |
+| *Echo, cycle 116: a perception and a reflection on the same cycle.* | *All four golden runs (a multi-instance root), cycle 120. Tab moves the panel between instances.* |
+
+**What is drawn.** Only cycle order is a position: one node per cycle with a thought, on an
+equal-arc Archimedean spiral (the same function [`scripts/render_stage.py`](./scripts/render_stage.py)
+uses, in [`acsf_usd/schematic.py`](./acsf_usd/schematic.py), so the film and the viewer place
+every node identically); a node's size follows its thought's length. Everything else is a mark
+or a labelled gauge, never a coordinate: a pulse from the stage's own `Stimulus` sphere on a
+perception (coloured by `acsf:perceptionSource`), a ring per reflection, a lit interlocutor cube
+per reply, one bar per mood dimension with its baseline tick, and text lines for attention,
+HOT-2, prediction and memory. Values are held from their sampled cycle, never blended; a
+channel the run did not journal says *not journaled in this run*, and mood that was only
+recorded at the end says *final value only*. The caption *synthetic schematic layout - not a
+body or a place* is on every frame.
+
+**Controls.** Space play/pause (one cycle per second times the speed), ←/→ step, Home/End
+first/last, `[`/`]` speed, left-drag orbit, wheel zoom, click a node to jump to its cycle, Tab
+next instance, `T` cycle the panel (thought, reflection, perception, reply), `F` follow the
+newest cycle, `R` reset the camera, Esc/Q quit.
+
+**Strata.** The `[view]` extra does not bundle the native library: `acsf-usd fetch-strata`
+downloads the release asset pinned in [`acsf_usd/view/strata.lock`](./acsf_usd/view/strata.lock)
+(Strata v0.4.0, Linux x64 or Windows x64) into a per-user cache, checks it against the pinned
+SHA-256 and deletes it on a mismatch. `ACSF_USD_STRATA_LIB` points at a local build instead.
+Strata needs OpenGL 4.5; on a machine without a GPU, Mesa's llvmpipe works
+(`LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe`), headless through EGL. If the library is
+missing, does not load, is older than ABI 1.5 or cannot create a context, `view` prints one
+line saying why and exits 2. Strata has no macOS build. The Windows path (a hidden window
+standing in for EGL) has not been exercised yet.
+
+Design details: [ARCHITECTURE.md § 3D view](./ARCHITECTURE.md#3d-view-acsf-usd-view).
+
 ## Development
 
 ```bash
@@ -109,7 +165,12 @@ CI runs the same commands on Python 3.11 and 3.13, then exports the bundled gold
 (`tests/fixtures/golden`) and checks the result with `acsf-usd validate`. A second workflow
 exports the same runs and checks every written layer with
 [usd-asset-gate](https://github.com/Preponderous-Software/usd-asset-gate), pinned to a commit and
-configured in [`.usd-asset-gate.yml`](./.usd-asset-gate.yml). Tests use no network and no LLM.
+configured in [`.usd-asset-gate.yml`](./.usd-asset-gate.yml). A `view` job installs Mesa's
+llvmpipe, fetches the pinned Strata library, renders the golden runs headless and compares them
+with the images in `tests/fixtures/view` (a small tolerance, since software rasterisers differ
+between Mesa versions), and drives the window once under Xvfb; the rendered images are kept as
+a build artifact. Without the library, the Strata tests skip. Tests use no LLM, and no network
+beyond that one SHA-pinned download.
 
 ## License
 
