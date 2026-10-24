@@ -3,14 +3,14 @@
 # SHA256SUMS) and deletes it on a mismatch. ACSF_USD_STRATA_LIB points at a local build instead.
 # The [view] extra pins Strata's Python binding (strata-engine) to the same tag.
 
-release = "v0.5.0"
-version = "0.5.0"
-base_url = "https://github.com/Preponderous-Software/strata/releases/download/v0.5.0"
+release = "v0.6.0"
+version = "0.6.0"
+base_url = "https://github.com/Preponderous-Software/strata/releases/download/v0.6.0"
 
 [assets.linux-x64]
-name = "libstrata-0.5.0-linux-x64.so"
-sha256 = "44f8263426b546c04295b1033032fded97541060c8e804873894d43e80fcffcb"
+name = "libstrata-0.6.0-linux-x64.so"
+sha256 = "3815068f90afa67b42177359a7ea918a5de321d7f7bad8706fa5275c4906af2a"
 
 [assets.win-x64]
-name = "strata-0.5.0-win-x64.dll"
-sha256 = "8a0ae3dedfb13cc5a0a66a4301cba6a625137d7f86e44b13bb8dbd587dfb0bcd"
+name = "strata-0.6.0-win-x64.dll"
+sha256 = "93236e25bb38f422d2033d9d19ab9d181515078e0d6b63addbb1ec2a9d095c13"

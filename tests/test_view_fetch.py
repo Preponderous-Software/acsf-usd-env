@@ -13,11 +13,11 @@ from acsf_usd.view import fetch as F
 
 def test_packaged_lock_pins_v050() -> None:
     lock = F.load_lock()
-    assert lock.release == "v0.5.0"
+    assert lock.release == "v0.6.0"
     linux = lock.assets["linux-x64"]
-    assert linux.name == "libstrata-0.5.0-linux-x64.so"
-    assert linux.sha256.startswith("44f82634") and len(linux.sha256) == 64
-    assert linux.url.endswith("/releases/download/v0.5.0/libstrata-0.5.0-linux-x64.so")
+    assert linux.name == "libstrata-0.6.0-linux-x64.so"
+    assert linux.sha256.startswith("3815068f") and len(linux.sha256) == 64
+    assert linux.url.endswith("/releases/download/v0.6.0/libstrata-0.6.0-linux-x64.so")
     assert lock.assets["win-x64"].name.endswith(".dll")
 
 

@@ -265,7 +265,7 @@ stage contract and its CI.
 | `acsf_usd/view/model.py` | Reads a stage with `pxr` into time-sampled channels. Refuses a file without `acsf:*` layer metadata and an `acsf:exporterVersion` major it does not know. Reads each instance's own layer metadata in a multi-instance root. |
 | `acsf_usd/view/scene.py` | What one frame shows, as plain data: primitives, lines, glow points, text and the text panel's backing rectangle. Camera maths (look-at, perspective, projection, picking rays) in Python; a test checks the matrices against Strata's own `strata_camera_look_at` (through the binding's `look_at`). |
 | `acsf_usd/view/strata.py` | Frozen draw records (`Prim`, `Line`, `Glow`, `Label`, `Panel`) and a thin `Engine` that turns them into the structs of Strata's official Python binding (`strata-engine`, `bindings/python` in the Strata repository). The binding declares `strata.h` and checks the ABI major and every struct layout against the library at load; the viewer needs ABI 1.x with x ≥ 5, and draws the panel backing when the library has ABI 1.11. The binding is imported only when a library is loaded, so `export` never imports it. |
-| `acsf_usd/view/fetch.py`, `strata.lock` | The pinned release (v0.5.0) and per-platform asset SHA-256s; download into a per-user cache, verify, delete on mismatch; `ACSF_USD_STRATA_LIB` overrides. |
+| `acsf_usd/view/fetch.py`, `strata.lock` | The pinned release (v0.6.0) and per-platform asset SHA-256s; download into a per-user cache, verify, delete on mismatch; `ACSF_USD_STRATA_LIB` overrides. |
 | `acsf_usd/view/app.py` | Headless PNGs, the window loop, input handling (`Controller`, testable with synthetic events) and `--watch` (`StageWatcher`). |
 
 **Encoding rules.** R1: only cycle order is a position (one node per cycle with a thought).
@@ -307,7 +307,7 @@ one line on stderr and exit 2. The exporter commands never import `acsf_usd.view
 | `mypy` | `>=2.4` (dev) | Strict typing, mirroring ACSF's CI. |
 | `ruff` | `>=0.17` (dev) | Lint/format. |
 | `pillow` | `>=11` (dev) | Golden-image comparison in the viewer tests. |
-| [Strata](https://github.com/Preponderous-Software/strata) | v0.5.0 (ABI 1.11), `[view]` only | The 3D engine `acsf-usd view` draws with, loaded through Strata's official Python binding (`strata-engine` 0.5.0, ctypes; not on PyPI, so the `[view]` extra pins the `v0.5.0` tag's source archive with `#subdirectory=bindings/python`); the native library is not bundled — `acsf-usd fetch-strata` downloads the release asset pinned with its SHA-256 in `acsf_usd/view/strata.lock`. MIT. |
+| [Strata](https://github.com/Preponderous-Software/strata) | v0.6.0 (ABI 1.12), `[view]` only | The 3D engine `acsf-usd view` draws with, loaded through Strata's official Python binding (`strata-engine` 0.6.0, ctypes; not on PyPI, so the `[view]` extra pins the `v0.6.0` tag's source archive with `#subdirectory=bindings/python`); the native library is not bundled — `acsf-usd fetch-strata` downloads the release asset pinned with its SHA-256 in `acsf_usd/view/strata.lock`. MIT. |
 
 ## Testing strategy
 

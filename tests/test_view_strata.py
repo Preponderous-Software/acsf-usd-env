@@ -50,7 +50,7 @@ def test_bound_structs_and_abi(lib: Library) -> None:
 
 
 def test_pinned_release_has_the_panel_backing(lib: Library) -> None:
-    # strata.lock pins Strata 0.5.0 (ABI 1.11): filled rectangles back the text panel
+    # strata.lock pins Strata 0.6.0 (ABI 1.12): filled rectangles back the text panel
     if os.environ.get("ACSF_USD_STRATA_LIB"):
         pytest.skip("a local Strata build may predate ABI 1.11")
     assert lib.abi[1] >= 11 and lib.has_rects
