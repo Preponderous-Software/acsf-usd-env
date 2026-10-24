@@ -241,6 +241,32 @@ def test_thought_after_a_thought_less_cycle_starts_a_new_cycle() -> None:
     assert _cycle_map(events) == [("cycle", 1, False), ("thought", 2, False), ("cycle", 2, False)]
 
 
+@pytest.mark.parametrize("second", [5, 3])
+def test_journaled_thought_count_that_does_not_advance_is_kept_with_a_warning(
+    second: int, caplog: pytest.LogCaptureFixture
+) -> None:
+    events = _events(
+        _line("thought", "a"),
+        _line("cycle", "a", thought_count=5),
+        _line("thought", "b"),
+        _line("cycle", "b", thought_count=second),
+    )
+    with caplog.at_level(logging.WARNING, logger="acsf_usd.reader.cycles"):
+        indexed = index_events(events)
+    # The journaled number stays authoritative even when it repeats or goes back.
+    assert [i.cycle for i in indexed.events] == [5, 5, second, second]
+    assert [r.getMessage() for r in caplog.records] == [
+        f"cycle thought_count {second} does not advance past cycle 5"
+    ]
+
+
+def test_first_journaled_cycle_is_never_warned_about(caplog: pytest.LogCaptureFixture) -> None:
+    events = _events(_line("thought", "a"), _line("cycle", "a", thought_count=0))
+    with caplog.at_level(logging.WARNING, logger="acsf_usd.reader.cycles"):
+        assert [i.cycle for i in index_events(events).events] == [0, 0]
+    assert caplog.records == []
+
+
 def test_streamed_and_in_memory_parsing_agree() -> None:
     path = INSTANCES / "Nova" / "journal.jsonl"
     assert read_journal(path).events == parse_journal_bytes(path.read_bytes()).events
