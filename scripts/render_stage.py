@@ -43,19 +43,22 @@ from typing import Any
 
 REPO = Path(__file__).resolve().parent.parent
 GOLDEN = REPO / "tests" / "fixtures" / "golden"
-CAPTION = "synthetic schematic layout \u2014 not a body or a place"
+# Blender's bundled Python does not have acsf-usd-env installed: import the shared encoding
+# (the spiral, node sizes, colours and caption that `acsf-usd view` also uses) from the checkout.
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
 
-# Colours (linear RGB) — drawing choices only.
-THOUGHT_RGB = (0.35, 0.75, 1.0)
-PERCEPTION_RGB = (0.55, 1.0, 0.75)
-REFLECTION_RGB = (1.0, 0.55, 0.12)
-THREAD_RGB = (0.25, 0.45, 0.8)
-MOOD_RGB = {
-    "contentment": (1.0, 0.75, 0.3),
-    "curiosity": (0.2, 0.85, 1.0),
-    "wonder": (0.7, 0.4, 1.0),
-    "melancholy": (0.2, 0.3, 0.9),
-}
+from acsf_usd.schematic import (  # noqa: E402
+    CAPTION,
+    MOOD_RGB,
+    PERCEPTION_RGB,
+    REFLECTION_RGB,
+    SPIRAL_R_MAX,
+    THOUGHT_RGB,
+    THREAD_RGB,
+    node_radius,
+    spiral_positions,
+)
 
 
 def frame_of(cycle: float, c0: float, c1: float, pad: int, play: int) -> float:
@@ -275,29 +278,23 @@ def blender_main(argv: list[str]) -> None:
 
     counts: list[dict[str, Any]] = []
     centers = []
-    # Archimedean spiral in the USD XZ plane around the instance origin (drawing choice).
-    r0, turns, r_max = 0.7, 4.0, 4.0
-    b = (r_max - r0) / (2 * math.pi * turns)
+    # Archimedean spiral in the USD XZ plane around the instance origin (drawing choice),
+    # shared with `acsf-usd view` through acsf_usd.schematic.
+    r_max = SPIRAL_R_MAX
     for inst in data["instances"]:
         ox, oy, oz = inst["origin"]
         centers.append(u2b((ox, oy, oz)))
         cycles = sorted(inst["thought_len"])
         n = len(cycles)
-        theta_max = 2 * math.pi * turns
         maxlen = max(inst["thought_len"].values(), default=1)
         node_pos: dict[float, tuple[float, float, float]] = {}
         pts = []
-        for i, c in enumerate(cycles):
-            # Equal arc spacing: arc length of r = r0 + b*θ grows ~ quadratically in θ.
-            # L(θ) ≈ r0·θ + b·θ²/2; solve L(θ) = s·L(θ_max) for θ.
-            s = i / max(n - 1, 1)
-            l_target = s * (r0 * theta_max + b * theta_max**2 / 2)
-            theta = (-r0 + math.sqrt(r0 * r0 + 2 * b * l_target)) / b
-            r = r0 + b * theta
-            p = u2b((ox + r * math.cos(theta), oy - 0.12 * r, oz + r * math.sin(theta)))
+        spiral = spiral_positions(cycles, (ox, oy, oz))
+        for c in cycles:
+            p = u2b(spiral[c])
             node_pos[c] = p
             pts.append(p)
-            size = 0.045 + 0.06 * inst["thought_len"][c] / maxlen
+            size = node_radius(inst["thought_len"][c], maxlen)
             o = new_obj(f"{inst['name']}_thought_{int(c)}", me_node, m_thought, p)
             f = fr(c)
             key_scale(o, f - 1, 0.0)

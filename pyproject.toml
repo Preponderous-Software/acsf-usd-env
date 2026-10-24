@@ -18,7 +18,12 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9.1", "mypy>=2.4", "ruff>=0.17"]
+# `acsf-usd view` (RFC 0031). Strata is reached through ctypes from the standard library and the
+# native library is downloaded by `acsf-usd fetch-strata` (SHA-pinned in strata.lock), so the
+# extra adds no Python package today; it names the feature so installs stay stable when a Strata
+# Python binding is published.
+view = []
+dev = ["pytest>=9.1", "mypy>=2.4", "ruff>=0.17", "pillow>=11"]
 
 [project.scripts]
 acsf-usd = "acsf_usd.cli:main"
@@ -31,6 +36,10 @@ version = { attr = "acsf_usd.__version__" }
 
 [tool.setuptools.packages.find]
 include = ["acsf_usd*"]
+
+[tool.setuptools.package-data]
+acsf_usd = ["py.typed"]
+"acsf_usd.view" = ["strata.lock"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

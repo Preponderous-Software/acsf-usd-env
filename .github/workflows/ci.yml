@@ -42,3 +42,43 @@ jobs:
           acsf-usd export tests/fixtures/golden -o "$out/golden.usdc" --binary
           acsf-usd validate "$out/golden.usdc" tests/fixtures/golden
           git diff --exit-code -- tests/fixtures
+
+  view:
+    name: view (Strata on llvmpipe)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Mesa (EGL, llvmpipe) and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1 libegl-mesa0 libgl1-mesa-dri libgl1 xvfb
+      - name: Install
+        run: python -m pip install ".[dev,view]"
+      - name: acsf-usd fetch-strata (SHA-256 pinned in strata.lock)
+        run: acsf-usd fetch-strata
+      - name: Strata tests and golden images
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          GALLIUM_DRIVER: llvmpipe
+          ACSF_USD_VIEW_ARTIFACTS: ${{ runner.temp }}/view
+        run: pytest -ra tests/test_view_strata.py
+      - name: Headless --png and the window under Xvfb
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          out="$RUNNER_TEMP/view"
+          acsf-usd export tests/fixtures/golden -o "$out/stages/run.usda"
+          acsf-usd view "$out/stages/run.usda" --png "$out/golden.png" --cycle 1 --cycle 120 --instance Wren
+          xvfb-run -a -s "-screen 0 1280x720x24" acsf-usd view "$out/stages/run.usda" --frames 30
+      - name: Upload the rendered images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: view-images
+          path: ${{ runner.temp }}/view/*.png
+          if-no-files-found: warn

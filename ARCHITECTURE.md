@@ -251,6 +251,48 @@ composition stays batch-only.
   the old offset between two polls is not detected as a rewrite. Only one instance can be
   followed; several inputs or a collection with `--follow` is a usage error.
 
+## 3D view (`acsf-usd view`)
+
+A read-only viewer that opens exported stages and draws them with
+[Strata](https://github.com/Preponderous-Software/strata) through its C ABI. It lives here as the
+optional `[view]` extra rather than a separate repository, so it shares this repository's reader of the
+stage contract and its CI.
+
+| Module | Role |
+|---|---|
+| `acsf_usd/schematic.py` | The spiral (equal-arc Archimedean, 4 turns, radius 0.7 to 4, XZ plane, Y up), node sizes, colours and caption. Standard library only; `scripts/render_stage.py` (Blender) imports it too, so the film and the viewer place every node identically. Nothing here is authored into the stage. |
+| `acsf_usd/view/model.py` | Reads a stage with `pxr` into time-sampled channels. Refuses a file without `acsf:*` layer metadata and an `acsf:exporterVersion` major it does not know. Reads each instance's own layer metadata in a multi-instance root. |
+| `acsf_usd/view/scene.py` | What one frame shows, as plain data: primitives, lines, glow points and text. Camera maths (look-at, perspective, projection, picking rays) in Python; a test checks the matrices against Strata's own `strata_camera_look_at`. |
+| `acsf_usd/view/strata.py` | A `ctypes` declaration of the slice of `strata.h` the viewer uses. Every struct is checked against `strata_struct_size` at load; the ABI must be 1.x with x ≥ 5. |
+| `acsf_usd/view/fetch.py`, `strata.lock` | The pinned release (v0.4.0) and per-platform asset SHA-256s; download into a per-user cache, verify, delete on mismatch; `ACSF_USD_STRATA_LIB` overrides. |
+| `acsf_usd/view/app.py` | Headless PNGs, the window loop, input handling (`Controller`, testable with synthetic events) and `--watch` (`StageWatcher`). |
+
+**Encoding rules.** R1: only cycle order is a position (one node per cycle with a thought).
+R2: scalars are labelled gauges or text, never coordinates. R3: event kinds are marks (a pulse
+from the `Stimulus` sphere on a perception, a ring per reflection, a lit interlocutor cube per
+reply). R4: values are held from their sampled cycle, never blended; an absent channel says
+"not journaled in this run", and mood recorded only in `state.json` says "final value only".
+The caption is on every frame. Between nodes the thread follows the spiral curve (for short
+runs the straight chords would cut across turns); node positions are exactly the film's.
+
+**Strata use.** Instanced primitives (spheres for nodes and the `Stimulus` sphere, cubes for
+interlocutors and mood bars), overlay lines (thread, rings, pulse, gauge frames), soft overlay
+points (glow) and 8x8 overlay text, with legacy lighting. No engine change was needed at ABI
+1.8. Strata's ray picking hits static meshes only, so node picking is a ray–sphere test in
+Python. Text is folded to ASCII (dashes, quotes, NFKD accents) because Strata's font covers
+printable ASCII; anything else shows as `?`. The text panel has no backing rectangle (Strata has
+no filled overlay rectangle at ABI 1.8): the default camera keeps the bottom band clear and the
+text uses Strata's shadow flag.
+
+**Live.** `--watch` polls the stage's modification time and reopens it; `export --follow`
+replaces the file atomically, a failed read keeps the last good stage ("waiting for stage") and
+is retried, and with `F` (on by default under `--watch`) the view stays on the newest cycle.
+The viewer never opens anything in an instance directory.
+
+**Failure modes.** No `acsf:*` metadata: refused. Unknown exporter major: refused, naming both
+versions. Strata missing, not loadable, older than ABI 1.5 or unable to create a GL 4.5 context:
+one line on stderr and exit 2. The exporter commands never import `acsf_usd.view.strata`.
+
 ## Dependencies
 
 | Dependency | Version | Why |
@@ -261,6 +303,8 @@ composition stays batch-only.
 | `pytest` | `>=9.1` (dev) | Tests. |
 | `mypy` | `>=2.4` (dev) | Strict typing, mirroring ACSF's CI. |
 | `ruff` | `>=0.17` (dev) | Lint/format. |
+| `pillow` | `>=11` (dev) | Golden-image comparison in the viewer tests. |
+| [Strata](https://github.com/Preponderous-Software/strata) | v0.4.0 (ABI 1.8), `[view]` only | The 3D engine `acsf-usd view` draws with, loaded through `ctypes`; not bundled — `acsf-usd fetch-strata` downloads the release asset pinned with its SHA-256 in `acsf_usd/view/strata.lock`. MIT. |
 
 ## Testing strategy
 
@@ -289,6 +333,15 @@ composition stays batch-only.
   [usd-asset-gate](https://github.com/Preponderous-Software/usd-asset-gate) at a pinned commit,
   using the rules in `.usd-asset-gate.yml` (`metersPerUnit: 1`, `upAxis: Y`, a 10 MB per-file
   limit, `fail_on: warning`). No network in tests; no LLM.
+- **3D view:** unit tests for the shared spiral (bit-for-bit equal to the film's former inline
+  formula), ASCII folding and wrapping, camera projection and picking, frame content (nodes up
+  to the cycle, rings, the lit `Stimulus` sphere, "not journaled" lines), controls driven by
+  synthetic events, `--watch` reloads and the SHA-checked fetch, none of which need Strata. A CI
+  `view` job installs Mesa's llvmpipe, fetches the pinned Strata, renders Echo at cycles 1, 116
+  and 200 and the four-run root at cycle 60, compares them with `tests/fixtures/view` (at most
+  1% of pixels may differ by more than 48 in a channel, and the image may not be blank), checks
+  the camera matrices against `strata_camera_look_at`, runs the window for a few frames under
+  Xvfb, and uploads the images.
 
 ## Decisions
 
