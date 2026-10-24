@@ -22,7 +22,7 @@ classifiers = [
 # on PyPI, so it is pinned to the source archive of the Strata tag strata.lock names. The native
 # library is downloaded separately by `acsf-usd fetch-strata` (SHA-256 pinned in strata.lock).
 view = [
-    "strata-engine @ https://github.com/Preponderous-Software/strata/archive/refs/tags/v0.5.0.tar.gz#subdirectory=bindings/python",
+    "strata-engine @ https://github.com/Preponderous-Software/strata/archive/refs/tags/v0.6.0.tar.gz#subdirectory=bindings/python",
 ]
 dev = ["pytest>=9.1", "mypy>=2.4", "ruff>=0.17", "pillow>=11"]
 
