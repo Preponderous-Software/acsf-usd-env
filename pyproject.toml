@@ -18,11 +18,12 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-# `acsf-usd view` (RFC 0031). Strata is reached through ctypes from the standard library and the
-# native library is downloaded by `acsf-usd fetch-strata` (SHA-pinned in strata.lock), so the
-# extra adds no Python package today; it names the feature so installs stay stable when a Strata
-# Python binding is published.
-view = []
+# `acsf-usd view` (RFC 0031). Strata's official Python binding (ctypes, no compiled code) is not
+# on PyPI, so it is pinned to the source archive of the Strata tag strata.lock names. The native
+# library is downloaded separately by `acsf-usd fetch-strata` (SHA-256 pinned in strata.lock).
+view = [
+    "strata-engine @ https://github.com/Preponderous-Software/strata/archive/refs/tags/v0.5.0.tar.gz#subdirectory=bindings/python",
+]
 dev = ["pytest>=9.1", "mypy>=2.4", "ruff>=0.17", "pillow>=11"]
 
 [project.scripts]
@@ -49,6 +50,11 @@ addopts = "-ra"
 strict = true
 python_version = "3.11"
 files = ["acsf_usd", "tests"]
+
+[[tool.mypy.overrides]]
+# The Strata binding ships no py.typed (and is optional: the [view] extra); it is typed as Any.
+module = ["strata", "strata.*"]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # usd-core ships no type information; pxr is typed as Any.

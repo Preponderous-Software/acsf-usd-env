@@ -11,7 +11,6 @@ rendered image there (CI uploads them).
 
 from __future__ import annotations
 
-import ctypes as C
 import os
 import shutil
 from pathlib import Path
@@ -22,7 +21,7 @@ from acsf_usd.cli import main
 from acsf_usd.view.fetch import FetchError, resolve_library
 from acsf_usd.view.model import load_run
 from acsf_usd.view.scene import OrbitCamera
-from acsf_usd.view.strata import Camera, Engine, Library, StrataUnavailable
+from acsf_usd.view.strata import Engine, Library, StrataUnavailable
 
 PIL = pytest.importorskip("PIL.Image")
 GOLDENS = Path(__file__).parent / "fixtures" / "view"
@@ -46,18 +45,20 @@ def lib() -> Library:
 
 def test_bound_structs_and_abi(lib: Library) -> None:
     assert lib.abi[0] == 1 and lib.abi[1] >= 5
+    # the official binding checked every struct the library has against its ctypes mirror
+    assert lib.binding.structs_checked > 0
+
+
+def test_pinned_release_has_the_panel_backing(lib: Library) -> None:
+    # strata.lock pins Strata 0.5.0 (ABI 1.11): filled rectangles back the text panel
+    if os.environ.get("ACSF_USD_STRATA_LIB"):
+        pytest.skip("a local Strata build may predate ABI 1.11")
+    assert lib.abi[1] >= 11 and lib.has_rects
 
 
 def test_camera_matrices_match_strata_look_at(lib: Library) -> None:
     cam = OrbitCamera(target=(1.0, -2.0, -1.4), distance=16.5, yaw=25.0, pitch=44.0)
-    fn = lib.dll.strata_camera_look_at
-    fn.restype = C.c_int32
-    fn.argtypes = [C.c_float * 3] * 3 + [C.c_float] * 4 + [C.c_void_p]
-    out = Camera()
-    f3 = C.c_float * 3
-    assert (
-        fn(f3(*cam.eye), f3(*cam.target), f3(0, 1, 0), 34.0, 16 / 9, 0.1, 400.0, C.byref(out)) == 0
-    )
+    out = lib.binding.look_at(cam.eye, cam.target, (0, 1, 0), 34.0, 16 / 9, 0.1, 400.0)
     assert list(out.view) == pytest.approx(cam.view_matrix(), abs=1e-5)
     assert list(out.projection) == pytest.approx(cam.projection_matrix(16 / 9), rel=1e-5, abs=1e-6)
 
@@ -97,6 +98,11 @@ def test_golden_images(
     golden = GOLDENS / name
     if os.environ.get("ACSF_USD_UPDATE_GOLDENS") == "1":
         shutil.copy(out, golden)
+    if lib.has_rects:  # the text panel's backing is drawn: lighter than the clear colour
+        img = PIL.open(out).convert("RGB")
+        w, h = img.size
+        backing, clear = img.getpixel((w - 4 - 8, h - 12)), img.getpixel((w - 2, h - 2))
+        assert sum(backing) > sum(clear) + 20, (backing, clear)
     differ, lit = _compare(out, golden)
     assert lit > 0.01, "the image is (nearly) blank"
     assert differ < 0.01, f"{differ:.2%} of pixels differ from {golden.name}"

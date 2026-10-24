@@ -45,6 +45,7 @@ from acsf_usd.view.strata import (
     Glow,
     Label,
     Line,
+    Panel,
     Prim,
 )
 
@@ -87,6 +88,9 @@ _TEXT = (0.92, 0.94, 0.98, 1.0)
 _SOFT = (0.72, 0.76, 0.86, 1.0)
 _WARM = (1.0, 0.92, 0.62, 1.0)
 _CURRENT = (1.0, 0.95, 0.6)
+# The text panel's backing (Strata ABI 1.11 filled rectangle, alpha blended over the scene).
+PANEL_BACKING: RGBA = (0.06, 0.075, 0.13, 0.88)
+PANEL_PAD = 8.0
 
 
 def fold_ascii(text: str) -> str:
@@ -283,6 +287,7 @@ class Frame:
     lines: list[Line] = field(default_factory=list)
     glows: list[Glow] = field(default_factory=list)
     labels: list[Label] = field(default_factory=list)
+    panels: list[Panel] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -663,7 +668,17 @@ def _draw_panel(
         if others
         else ""
     )
-    frame.labels.append(Label(MARGIN, y - SMALL_H - 6, SMALL, heading + hint, _DIM))
+    top = y - SMALL_H - 6
+    frame.panels.append(
+        Panel(
+            MARGIN - PANEL_PAD,
+            top - PANEL_PAD,
+            width - 2 * (MARGIN - PANEL_PAD),
+            height - MARGIN + PANEL_PAD - (top - PANEL_PAD),
+            PANEL_BACKING,
+        )
+    )
+    frame.labels.append(Label(MARGIN, top, SMALL, heading + hint, _DIM))
     col = _WARM if state.panel == "thought" else _TEXT
     for i, line in enumerate(lines):
         frame.labels.append(Label(MARGIN, y + i * LINE_H, FONT, line, col))

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -28,11 +29,26 @@ def test_view_with_a_file_that_is_not_a_library(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    pytest.importorskip("strata")  # the [view] extra's binding reports the load failure
     fake = tmp_path / "libstrata.so"
     fake.write_bytes(b"not a shared object")
     monkeypatch.setenv(F.ENV_LIB, str(fake))
     assert main(["view", str(view_stages["echo"])]) == 2
-    assert "cannot load" in capsys.readouterr().err
+    assert "could not load" in capsys.readouterr().err
+
+
+def test_view_without_the_binding_says_how_to_install_it(
+    view_stages: dict[str, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    lib = tmp_path / "libstrata.so"
+    lib.write_bytes(b"")
+    monkeypatch.setenv(F.ENV_LIB, str(lib))
+    monkeypatch.setitem(sys.modules, "strata", None)  # import strata raises ImportError
+    assert main(["view", str(view_stages["echo"])]) == 2
+    assert "acsf-usd-env[view]" in capsys.readouterr().err
 
 
 def test_view_refuses_a_non_stage_before_touching_strata(

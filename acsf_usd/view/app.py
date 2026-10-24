@@ -68,6 +68,7 @@ class Renderer:
         self.engine.submit_primitives(frame.prims)
         self.engine.submit_lines(frame.lines)
         self.engine.submit_points(frame.glows)
+        self.engine.submit_panels(frame.panels)
         self.engine.submit_text(frame.labels)
         self.engine.end_frame()
 
