@@ -40,7 +40,9 @@ Direction: **ACSF → USD only.** The USD → ACSF direction ends the MVP as a w
 - Per-cycle workspace history (ACSF does not journal it).
 - Long-term memory text and embeddings (`memory.db` rows, `cycle.retrieved` summaries).
   Counts only.
-- A viewer. Any USD viewer is used; `usdview` is not shipped by `usd-core`.
+- A viewer. Any USD viewer is used; `usdview` is not shipped by `usd-core`. (`acsf-usd view`,
+  the optional `[view]` extra, was added after the MVP; see
+  [ARCHITECTURE.md § 3D view](./ARCHITECTURE.md#3d-view-acsf-usd-view).)
 
 ## Acceptance criteria (MVP as a whole)
 

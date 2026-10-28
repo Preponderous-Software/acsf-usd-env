@@ -75,9 +75,12 @@ acsf_usd/
   stage/        USD writers: static snapshot, time-sampled channels, schematic layout, composition
   follow.py     `--follow`: poll journal.jsonl from a byte offset, re-author the instance layer
   validate.py   `acsf-usd validate`: re-read a stage and check it against its source journal
-  cli.py        `acsf-usd export [--follow] [--binary] | validate | describe`
+  schematic.py  The viewer's and the Blender film's shared spiral, sizes and colours (stdlib only)
+  view/         `acsf-usd view` and `fetch-strata`, the optional `[view]` extra (see 3D view)
+  cli.py        `acsf-usd export [--follow] [--binary] | validate | describe | view | fetch-strata`
 tests/
-  fixtures/     Small synthetic journals + states; golden-run copies pinned to an ACSF SHA
+  fixtures/     Small synthetic journals + states; golden-run copies pinned to an ACSF SHA;
+                the viewer's reference images
 ```
 
 | Component | Responsibility |

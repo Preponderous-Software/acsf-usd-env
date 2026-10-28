@@ -93,7 +93,10 @@ ACSF run onto it gives a run a durable, tool-agnostic playback format without in
 
 ## Non-goals
 
-- **No physics, rendering, sensors or robotics.** Nothing here simulates a body.
+- **No physics, sensors or robotics, and no rendered world.** Nothing here simulates a body.
+  Rendering is limited to drawing an exported stage's synthetic schematic layout (the
+  optional `acsf-usd view`, and the Blender script `scripts/render_stage.py`): logged events,
+  not a world, a body or a place.
 - **No invented spatial semantics.** The schematic layout never feeds back into ACSF and is
   marked `acsf:layout:synthetic = true` on the stage.
 - **No changes to ACSF in the MVP.** The tool is read-only against ACSF artifacts; the
@@ -101,7 +104,8 @@ ACSF run onto it gives a run a durable, tool-agnostic playback format without in
 - **No writing to instance directories.** The exporter never modifies `journal.jsonl`,
   `state.json`, `memory.db` or any other file under `CONSCIOUSNESS_HOME`.
 - **Not a dashboard replacement.** Live viewing stays with ACSF's web dashboard;
-  `--follow` only keeps a stage file current for USD tools.
+  `--follow` only keeps a stage file current for USD tools, and `acsf-usd view --watch` only
+  redraws that file.
 - **No long-term memory contents in the stage.** Neither `memory.db` embeddings (thousands of
   dimensions per row) nor memory text; long-term memory appears as counts only.
 
