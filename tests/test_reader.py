@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from acsf_usd.model import Event
+from acsf_usd.model import Event, Snapshot, WorkspaceItem
 from acsf_usd.reader import (
     InputError,
     index_events,
@@ -23,6 +23,7 @@ from acsf_usd.reader import (
     resolve_instance_dir,
 )
 from acsf_usd.reader.resolve import consciousness_home
+from acsf_usd.reader.state import parse_state_bytes
 from tests.conftest import INSTANCES
 
 
@@ -341,6 +342,120 @@ def test_bad_state_yields_no_snapshot(tmp_path: Path, content: bytes) -> None:
 def test_missing_state_yields_no_snapshot(tmp_path: Path) -> None:
     snapshot, warning = read_state(tmp_path / "state.json")
     assert snapshot is None and warning is not None and "not found" in warning
+
+
+def _snapshot(payload: dict[str, object]) -> Snapshot:
+    # json.dumps writes NaN/Infinity tokens, which json.loads (and so the reader) accepts.
+    snapshot, warning = parse_state_bytes(json.dumps(payload).encode())
+    assert warning is None and snapshot is not None
+    return snapshot
+
+
+def test_empty_state_object_is_an_empty_snapshot() -> None:
+    assert _snapshot({}) == Snapshot()
+
+
+def test_state_identity_that_is_not_an_object_is_ignored() -> None:
+    assert _snapshot({"identity": ["Nova"], "thought_count": 2}) == Snapshot(thought_count=2)
+    assert _snapshot({"identity": {"attention_schema": "thought"}}) == Snapshot()
+
+
+def test_state_identity_fields_of_the_wrong_type_are_dropped() -> None:
+    snapshot = _snapshot(
+        {
+            "identity": {
+                "name": 7,
+                "origin_story": None,
+                "purpose": ["p"],
+                "self_concept": "a listener",
+                "values": ["curiosity", 1, None, "care", True],
+                "personality_traits": "warm",
+                "amendments": {"0": "x"},
+            }
+        }
+    )
+    assert (snapshot.name, snapshot.origin_story, snapshot.purpose) == (None, None, None)
+    assert snapshot.self_concept == "a listener"
+    assert snapshot.values == ("curiosity", "care")
+    assert snapshot.personality_traits == ()
+    assert snapshot.amendments == ()
+
+
+def test_state_mood_keeps_only_finite_non_boolean_numbers() -> None:
+    snapshot = _snapshot(
+        {
+            "identity": {
+                "mood": {
+                    "curiosity": 0.5,
+                    "wonder": 1,
+                    "calm": True,
+                    "joy": "high",
+                    "nan": float("nan"),
+                    "inf": float("inf"),
+                    "none": None,
+                },
+                "initial_mood": [0.5],
+            }
+        }
+    )
+    assert snapshot.mood == {"curiosity": 0.5, "wonder": 1.0}
+    assert isinstance(snapshot.mood["wonder"], float)
+    assert snapshot.initial_mood == {}
+
+
+@pytest.mark.parametrize(
+    ("salience", "expected"),
+    [(0.25, 0.25), (1, 1.0), (True, None), ("0.9", None), (float("nan"), None), (None, None)],
+)
+def test_state_attention_salience_coercion(salience: object, expected: float | None) -> None:
+    snapshot = _snapshot(
+        {"identity": {"attention_schema": {"focus": 3, "theme": "tides", "salience": salience}}}
+    )
+    assert snapshot.attention_focus is None
+    assert snapshot.attention_theme == "tides"
+    assert snapshot.attention_salience == expected
+
+
+@pytest.mark.parametrize(
+    ("thought_count", "expected"),
+    [(4, 4), (0, 0), (True, None), (4.0, None), ("4", None), (None, None)],
+)
+def test_state_thought_count_must_be_a_non_boolean_integer(
+    thought_count: object, expected: int | None
+) -> None:
+    assert _snapshot({"thought_count": thought_count}).thought_count == expected
+
+
+def test_state_short_term_keeps_object_items_and_defaults_their_fields() -> None:
+    snapshot = _snapshot(
+        {
+            "short_term": [
+                "loose text",
+                3,
+                None,
+                {},
+                {
+                    "kind": 1,
+                    "content": "c",
+                    "timestamp": ["t"],
+                    "importance": "high",
+                    "seq": True,
+                },
+                {"kind": "thought", "importance": float("-inf"), "seq": 2.0},
+                {"kind": "perception", "importance": 3, "seq": 5},
+            ]
+        }
+    )
+    assert snapshot.short_term == (
+        WorkspaceItem(kind="", content="", timestamp="", importance=0.0, seq=None),
+        WorkspaceItem(kind="", content="c", timestamp="", importance=0.0, seq=None),
+        WorkspaceItem(kind="thought", content="", timestamp="", importance=0.0, seq=None),
+        WorkspaceItem(kind="perception", content="", timestamp="", importance=3.0, seq=5),
+    )
+
+
+def test_state_short_term_that_is_not_a_list_is_empty() -> None:
+    assert _snapshot({"short_term": {"kind": "thought"}}).short_term == ()
 
 
 # --- input resolution -----------------------------------------------------------------
