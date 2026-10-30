@@ -1,7 +1,7 @@
 """`acsf-usd validate` internals: checks exercised directly on an in-memory stage.
 
 The end-to-end validate command is covered in test_e2e.py; these tests pin the branches it
-does not reach (a missing instance prim, a ``acsf:cycleIndexing`` mismatch, a missing time
+does not reach (a missing instance prim, an ``acsf:cycleIndexing`` mismatch, a missing time
 sample, samples outside the journal's cycles, utterances without a recipient, finding a single
 run's prim by ``acsf:name``, truncated mismatch values, and the report format).
 """
