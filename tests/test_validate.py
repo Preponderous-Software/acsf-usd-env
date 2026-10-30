@@ -1,12 +1,16 @@
 """`acsf-usd validate` internals: checks exercised directly on an in-memory stage.
 
 The end-to-end validate command is covered in test_e2e.py; these tests pin the branches it
-does not reach (a missing instance prim, samples outside the journal's cycles, finding a
-single run's prim by ``acsf:name``, truncated mismatch values, and the report format).
+does not reach (a missing instance prim, a ``acsf:cycleIndexing`` mismatch, a missing time
+sample, samples outside the journal's cycles, utterances without a recipient, finding a single
+run's prim by ``acsf:name``, truncated mismatch values, and the report format).
 """
 
 from __future__ import annotations
 
+from dataclasses import replace
+
+import pytest
 from pxr import Sdf, Usd
 
 from acsf_usd.model import InstanceRun
@@ -37,6 +41,42 @@ def test_a_missing_instance_prim_is_the_only_problem_reported() -> None:
     assert report.problems == ["/World/Instances/Missing: instance prim not found"]
     assert report.cycles == 0
     assert report.checked == {}
+
+
+def test_a_cycle_indexing_mismatch_is_reported() -> None:
+    run, stage = _nova()
+    counted = replace(run, journal=replace(run.journal, indexing="counted"))
+    report = validate_instance(stage, counted, "Nova")
+    assert report.problems == ["acsf:cycleIndexing is 'journaled', the journal needs 'counted'"]
+
+
+def test_a_cycle_without_a_time_sample_is_reported() -> None:
+    run, stage = _nova()
+    stage.GetPrimAtPath(f"{NOVA}/Stimulus").GetAttribute("acsf:perception").ClearAtTime(2)
+    report = validate_instance(stage, run, "Nova")
+    assert report.problems == ["Stimulus.acsf:perception cycle 2: no time sample"]
+
+
+@pytest.mark.parametrize("extras", [{}, {"to": ""}, {"to": 7}])
+def test_an_utterance_without_a_recipient_is_checked_as_unknown(extras: dict[str, object]) -> None:
+    run = read_instance(INSTANCES / "Nova")
+    events = tuple(
+        replace(i, event=replace(i.event, extras=extras))
+        if i.event.type == "utterance" and i.event.extras.get("to") == "Dana"
+        else i
+        for i in run.journal.events
+    )
+    run = replace(run, journal=replace(run.journal, events=events))
+    stage = build_instance_stage(run)
+    report = validate_instance(stage, run, "Nova")
+    assert report.problems == []
+    assert report.checked["utterance"] == 2
+    utterance = stage.GetPrimAtPath(f"{NOVA}/Interlocutors/unknown").GetAttribute("acsf:utterance")
+    utterance.Set("tampered", 2)
+    assert validate_instance(stage, run, "Nova").problems == [
+        "Interlocutors[unknown].acsf:utterance cycle 2: stage has 'tampered', "
+        "journal has 'Hello Dana. I was thinking about tide pools.'"
+    ]
 
 
 def test_samples_outside_the_journals_cycles_are_reported() -> None:
