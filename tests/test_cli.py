@@ -2,7 +2,7 @@
 
 Pins the help printed with no command, `describe` on an instance with only a snapshot or only
 a journal, warnings going to this invocation's stderr (and the handler being removed again),
-and `describe` on a missing input.
+`describe` on a missing input, and `validate` on a stage that is missing or cannot be opened.
 """
 
 from __future__ import annotations
@@ -73,3 +73,23 @@ def test_describe_missing_input_exits_1(tmp_path: Path, capsys: pytest.CaptureFi
     assert captured.out == ""
     assert "acsf-usd: error: " in captured.err
     assert "no such directory" in captured.err
+
+
+def test_validate_missing_stage_exits_1(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    stage = tmp_path / "absent.usda"
+    assert main(["validate", str(stage), str(INSTANCES / "Ash")]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"acsf-usd: error: {stage}: no such file" in captured.err
+
+
+@pytest.mark.parametrize("name", ["bad.usda", "bad.usdc", "bad.txt"])
+def test_validate_unreadable_stage_exits_1(
+    name: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    stage = tmp_path / name
+    stage.write_text("not usd at all")
+    assert main(["validate", str(stage), str(INSTANCES / "Ash")]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"acsf-usd: error: {stage}: not a USD stage" in captured.err

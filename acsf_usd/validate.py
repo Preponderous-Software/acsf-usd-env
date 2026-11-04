@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from pxr import Sdf, Usd
+from pxr import Sdf, Tf, Usd
 
 from acsf_usd.model import InstanceRun
 from acsf_usd.stage.common import instance_path, prim_name
@@ -167,7 +167,12 @@ def instance_prims(stage: Usd.Stage, runs: Sequence[InstanceRun]) -> list[str]:
 
 
 def validate(stage_path: Path, runs: Sequence[InstanceRun]) -> list[InstanceReport]:
-    stage = Usd.Stage.Open(str(stage_path))
+    if not stage_path.is_file():
+        raise OSError(f"{stage_path}: no such file")
+    try:
+        stage = Usd.Stage.Open(str(stage_path))
+    except Tf.ErrorException:  # pxr raises this for a layer it cannot read
+        stage = None
     if stage is None:
         raise OSError(f"{stage_path}: not a USD stage")
     prims = instance_prims(stage, runs)

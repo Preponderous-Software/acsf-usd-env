@@ -283,6 +283,7 @@ def run_window(
     size: tuple[int, int],
     cycle: int | None = None,
     instance: str | None = None,
+    panel: str = "thought",
     watch: StageWatcher | None = None,
     max_frames: int | None = None,
     hidden: bool = False,
@@ -290,6 +291,7 @@ def run_window(
     state = ViewState(
         cycle=clamp_cycle(run, cycle),
         instance=instance_index(run, instance),
+        panel=panel,
         interactive=True,
         follow=watch is not None and cycle is None,
     )

@@ -127,6 +127,7 @@ def run_view(args: argparse.Namespace) -> int:
             size=size,
             cycle=cycles[-1],
             instance=args.instance,
+            panel=args.panel,
             watch=StageWatcher(args.stage) if args.watch else None,
             max_frames=args.frames,
         )

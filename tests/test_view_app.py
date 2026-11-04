@@ -8,10 +8,11 @@ from pathlib import Path
 
 import pytest
 
-from acsf_usd.view import app
+from acsf_usd.cli import main
+from acsf_usd.view import app, fetch
 from acsf_usd.view.app import Controller, StageWatcher, clamp_cycle, instance_index
 from acsf_usd.view.model import RunView, StageError, load_run
-from acsf_usd.view.scene import Layout, ViewState, frame_camera
+from acsf_usd.view.scene import Layout, OrbitCamera, ViewState, frame_camera
 from acsf_usd.view.strata import (
     EVENT_KEY_DOWN,
     EVENT_MOUSE_BUTTON_DOWN,
@@ -153,3 +154,55 @@ def test_helpers(view_stages: dict[str, Path]) -> None:
     assert instance_index(run, "Sage") == 2 and instance_index(run, None) == 0
     with pytest.raises(StageError, match="Echo, Rafael, Sage, Wren"):
         instance_index(run, "Nobody")
+
+
+class _FakeEngine:
+    """The part of ``Engine`` the window loop calls when ``Renderer.draw`` is replaced."""
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        pass
+
+    def __enter__(self) -> _FakeEngine:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        pass
+
+    def set_legacy_lighting(self, *args: object) -> None:
+        pass
+
+    def drawable_size(self) -> tuple[int, int]:
+        return W, H
+
+    def poll_events(self) -> list[InputEvent]:
+        return []
+
+    def present(self) -> None:
+        pass
+
+
+@pytest.mark.parametrize(
+    ("flags", "panel"),
+    [([], "thought"), (["--panel", "reflection"], "reflection"), (["--panel", "reply"], "reply")],
+)
+def test_window_opens_on_the_requested_panel(
+    flags: list[str],
+    panel: str,
+    view_stages: dict[str, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    panels: list[str] = []
+
+    class RecordingRenderer(app.Renderer):
+        def draw(self, state: ViewState, camera: OrbitCamera) -> None:
+            panels.append(state.panel)
+
+    lib = tmp_path / "libstrata.so"
+    lib.write_bytes(b"")
+    monkeypatch.setenv(fetch.ENV_LIB, str(lib))
+    monkeypatch.setattr("acsf_usd.view.strata.Library", lambda path: object())
+    monkeypatch.setattr(app, "Engine", _FakeEngine)
+    monkeypatch.setattr(app, "Renderer", RecordingRenderer)
+    assert main(["view", str(view_stages["echo"]), "--frames", "1", *flags]) == 0
+    assert panels == [panel]
