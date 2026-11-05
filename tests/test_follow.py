@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import threading
@@ -245,6 +246,31 @@ def test_write_atomically_leaves_no_temporary_file_on_failure(
     assert output.read_text() == "previous"
 
 
+def test_write_atomically_gives_a_new_output_the_mode_a_batch_export_gets(tmp_path: Path) -> None:
+    batch = tmp_path / "batch.usda"
+    assert main(["export", str(INSTANCES / "Ash"), "-o", str(batch)]) == 0
+    live = tmp_path / "live.usda"
+    write_atomically(read_instance(INSTANCES / "Ash"), live, ExportOptions(), binary=False)
+    assert stat.S_IMODE(live.stat().st_mode) == stat.S_IMODE(batch.stat().st_mode)
+
+
+def test_write_atomically_keeps_the_mode_of_an_existing_output(tmp_path: Path) -> None:
+    output = tmp_path / "ash.usda"
+    output.write_text("previous")
+    output.chmod(0o640)
+    write_atomically(read_instance(INSTANCES / "Ash"), output, ExportOptions(), binary=False)
+    assert stat.S_IMODE(output.stat().st_mode) == 0o640
+    assert output.read_bytes().startswith(b"#usda 1.0")
+
+
+def test_write_atomically_creates_missing_parent_directories_as_batch_does(tmp_path: Path) -> None:
+    batch = tmp_path / "batch" / "nested" / "ash.usda"
+    assert main(["export", str(INSTANCES / "Ash"), "-o", str(batch)]) == 0
+    live = tmp_path / "live" / "nested" / "ash.usda"
+    write_atomically(read_instance(INSTANCES / "Ash"), live, ExportOptions(), binary=False)
+    assert live.read_bytes() == batch.read_bytes()
+
+
 # --- CLI usage ------------------------------------------------------------------------------
 
 
@@ -265,6 +291,14 @@ def test_follow_refuses_output_inside_the_instance(tmp_path: Path) -> None:
         main(["export", str(directory), "-o", str(directory / "x.usda"), "--follow"])
     assert excinfo.value.code == 2
     assert sorted(p.name for p in directory.iterdir()) == ["journal.jsonl", "state.json"]
+
+
+def test_follow_refuses_a_usdz_output(tmp_path: Path) -> None:
+    output = tmp_path / "x.usdz"
+    with pytest.raises(SystemExit) as excinfo:
+        main(["export", str(INSTANCES / "Nova"), "-o", str(output), "--follow"])
+    assert excinfo.value.code == 2
+    assert list(tmp_path.iterdir()) == []
 
 
 @pytest.mark.parametrize("value", ["0", "-1", "inf", "nan"])

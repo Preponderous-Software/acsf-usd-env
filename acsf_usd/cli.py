@@ -21,6 +21,7 @@ log = logging.getLogger("acsf_usd")
 
 TEXT_EXT = ".usda"
 BINARY_EXT = ".usdc"
+PACKAGE_EXT = ".usdz"  # USD reads these but refuses to export to them
 
 
 class UsageError(Exception):
@@ -139,6 +140,8 @@ def output_path(output: Path | None, name: str, binary: bool) -> Path:
     if output is None:
         return Path(f"{name}{wanted}")
     ext = output.suffix.lower()
+    if ext == PACKAGE_EXT:
+        raise UsageError(f"{output}: USD cannot write {ext} packages; use {wanted}")
     if ext in (TEXT_EXT, BINARY_EXT) and ext != wanted:
         flag = "with --binary" if binary else "without --binary"
         raise UsageError(f"{output}: a {ext} file cannot be written {flag}; use {wanted}")
