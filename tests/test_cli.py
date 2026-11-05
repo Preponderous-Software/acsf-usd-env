@@ -2,7 +2,8 @@
 
 Pins the help printed with no command, `describe` on an instance with only a snapshot or only
 a journal, warnings going to this invocation's stderr (and the handler being removed again),
-`describe` on a missing input, and `validate` on a stage that is missing or cannot be opened.
+`describe` on a missing input, `validate` on a stage that is missing or cannot be opened, and
+`export` to a path USD cannot write.
 """
 
 from __future__ import annotations
@@ -93,3 +94,36 @@ def test_validate_unreadable_stage_exits_1(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert f"acsf-usd: error: {stage}: not a USD stage" in captured.err
+
+
+@pytest.mark.parametrize("name", ["out.txt", "out.usdz", "out"])
+@pytest.mark.parametrize(
+    "inputs",
+    [[str(INSTANCES / "Nova")], [str(INSTANCES / "Nova"), str(INSTANCES / "Ash")]],
+    ids=["one", "several"],
+)
+def test_export_refuses_an_extension_usd_cannot_write(
+    name: str, inputs: list[str], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = tmp_path / name
+    with pytest.raises(SystemExit) as excinfo:
+        main(["export", *inputs, "-o", str(output)])
+    assert excinfo.value.code == 2
+    assert f"acsf-usd: error: {output}: " in capsys.readouterr().err
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "inputs",
+    [[str(INSTANCES / "Nova")], [str(INSTANCES / "Nova"), str(INSTANCES / "Ash")]],
+    ids=["one", "several"],
+)
+def test_export_to_a_path_that_cannot_be_written_exits_1(
+    inputs: list[str], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file where the output's directory would have to be")
+    assert main(["export", *inputs, "-o", str(blocker / "out.usda")]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"acsf-usd: error: could not write {blocker}" in captured.err
