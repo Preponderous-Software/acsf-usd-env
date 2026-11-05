@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from pxr import Sdf, Usd, UsdGeom
+from pxr import Sdf, Tf, Usd, UsdGeom
 
 from acsf_usd import __version__
 from acsf_usd.model import InstanceRun
@@ -82,6 +82,15 @@ def layer_metadata(
 
 def write_stage(stage: Usd.Stage, output: Path, binary: bool = False) -> None:
     """Export the stage's root layer as text (``usda``) or binary crate (``usdc``)."""
+    write_layer(stage.GetRootLayer(), output, binary=binary)
+
+
+def write_layer(layer: Sdf.Layer, output: Path, binary: bool = False) -> None:
+    """Export a layer; any way USD refuses to is an ``OSError`` naming ``output``."""
     args = {"format": "usdc" if binary else "usda"}
-    if not stage.GetRootLayer().Export(str(output), "", args):
+    try:
+        written = layer.Export(str(output), "", args)
+    except Tf.ErrorException as exc:  # pxr raises this rather than returning False
+        raise OSError(f"could not write {output}") from exc
+    if not written:
         raise OSError(f"could not write {output}")

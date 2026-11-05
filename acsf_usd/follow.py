@@ -20,6 +20,7 @@ from __future__ import annotations
 import logging
 import os
 import signal
+import stat
 import tempfile
 import threading
 from collections.abc import Callable
@@ -114,17 +115,35 @@ class StateFollower:
 
 
 def write_atomically(run: InstanceRun, output: Path, options: ExportOptions, binary: bool) -> None:
-    """Author the instance layer to a temporary file next to ``output``, then replace it."""
+    """Author the instance layer to a temporary file next to ``output``, then replace it.
+
+    The result is the file a batch export leaves: missing parent directories are created, an
+    existing output keeps its mode, and a new one gets the mode the umask gives it rather than
+    the private mode of the temporary file.
+    """
     suffix = ".usdc" if binary else ".usda"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        mode = stat.S_IMODE(output.stat().st_mode)
+    except FileNotFoundError:
+        mode = _new_file_mode()
     fd, tmp_name = tempfile.mkstemp(dir=output.parent, prefix=f".{output.name}.", suffix=suffix)
     os.close(fd)
     tmp = Path(tmp_name)
     try:
         write_stage(build_instance_stage(run, options), tmp, binary=binary)
+        os.chmod(tmp, mode)
         os.replace(tmp, output)
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
+
+
+def _new_file_mode() -> int:
+    """The mode a newly created file gets; the umask can only be read by setting it."""
+    umask = os.umask(0)
+    os.umask(umask)
+    return 0o666 & ~umask
 
 
 def follow(

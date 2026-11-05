@@ -96,21 +96,27 @@ def test_validate_unreadable_stage_exits_1(
     assert f"acsf-usd: error: {stage}: not a USD stage" in captured.err
 
 
-@pytest.mark.parametrize("name", ["out.txt", "out.usdz", "out"])
 @pytest.mark.parametrize(
     "inputs",
     [[str(INSTANCES / "Nova")], [str(INSTANCES / "Nova"), str(INSTANCES / "Ash")]],
     ids=["one", "several"],
 )
-def test_export_refuses_an_extension_usd_cannot_write(
-    name: str, inputs: list[str], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+def test_export_refuses_a_usdz_output_before_writing_anything(
+    inputs: list[str], tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    output = tmp_path / name
+    output = tmp_path / "out.usdz"
     with pytest.raises(SystemExit) as excinfo:
         main(["export", *inputs, "-o", str(output)])
     assert excinfo.value.code == 2
     assert f"acsf-usd: error: {output}: " in capsys.readouterr().err
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("name", ["out.txt", "out"])
+def test_export_writes_any_other_extension_in_the_flag_format(name: str, tmp_path: Path) -> None:
+    output = tmp_path / name
+    assert main(["export", str(INSTANCES / "Nova"), "-o", str(output)]) == 0
+    assert output.read_bytes().startswith(b"#usda 1.0")
 
 
 @pytest.mark.parametrize(

@@ -17,7 +17,7 @@ from pxr import Gf, Sdf, Usd, UsdGeom
 
 from acsf_usd import __version__
 from acsf_usd.model import InstanceRun
-from acsf_usd.stage.build import ExportOptions, build_instance_stage, write_stage
+from acsf_usd.stage.build import ExportOptions, build_instance_stage, write_layer, write_stage
 from acsf_usd.stage.common import WORLD, instance_path, prim_name
 
 INSTANCE_SPACING = 10.0
@@ -103,8 +103,7 @@ def export_composed(
     layer = Sdf.Layer.CreateAnonymous()
     layer.TransferContent(stage.GetRootLayer())
     layer.subLayerPaths = [f"./{path.name}" for path in layers]
-    if not layer.Export(str(root), "", {"format": "usdc" if binary else "usda"}):
-        raise OSError(f"could not write {root}")
+    write_layer(layer, root, binary=binary)
     return ComposedExport(
         root=root,
         layers=tuple(layers),

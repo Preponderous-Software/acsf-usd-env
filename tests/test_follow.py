@@ -293,6 +293,14 @@ def test_follow_refuses_output_inside_the_instance(tmp_path: Path) -> None:
     assert sorted(p.name for p in directory.iterdir()) == ["journal.jsonl", "state.json"]
 
 
+def test_follow_refuses_a_usdz_output(tmp_path: Path) -> None:
+    output = tmp_path / "x.usdz"
+    with pytest.raises(SystemExit) as excinfo:
+        main(["export", str(INSTANCES / "Nova"), "-o", str(output), "--follow"])
+    assert excinfo.value.code == 2
+    assert list(tmp_path.iterdir()) == []
+
+
 @pytest.mark.parametrize("value", ["0", "-1", "inf", "nan"])
 def test_poll_interval_must_be_positive_and_finite(value: str, tmp_path: Path) -> None:
     with pytest.raises(SystemExit) as excinfo:
