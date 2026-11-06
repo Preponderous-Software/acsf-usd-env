@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import signal
 import stat
@@ -227,6 +228,52 @@ def test_state_follower_keeps_previous_snapshot(tmp_path: Path) -> None:
     assert follower.poll() is False and follower.snapshot is good
     path.unlink()
     assert follower.poll() is False and follower.snapshot is good
+
+
+def test_state_follower_warns_once_about_a_lasting_problem(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    path = tmp_path / "state.json"
+    path.write_text("{truncated")
+    follower = StateFollower(path)
+    with caplog.at_level(logging.WARNING):
+        assert [follower.poll() for _ in range(3)] == [False, False, False]
+    assert len(caplog.records) == 1
+    assert "not valid JSON" in caplog.text
+
+
+def test_state_follower_warns_again_when_a_problem_comes_back(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps({"identity": {"name": "S"}}))
+    follower = StateFollower(path)
+    assert follower.poll() is True
+    with caplog.at_level(logging.WARNING):
+        path.write_text("{truncated")
+        follower.poll()
+        path.write_text(json.dumps({"identity": {"name": "S"}}))
+        follower.poll()
+        path.write_text("{truncated")
+        follower.poll()
+    assert len(caplog.records) == 2
+
+
+def test_state_follower_keeps_the_snapshot_when_the_file_cannot_be_read(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps({"identity": {"name": "S"}}))
+    follower = StateFollower(path)
+    assert follower.poll() is True
+    good = follower.snapshot
+    path.unlink()
+    path.mkdir()  # an OSError other than FileNotFoundError, for root and non-root users alike
+    with caplog.at_level(logging.WARNING):
+        assert [follower.poll() for _ in range(2)] == [False, False]
+    assert follower.snapshot is good
+    assert len(caplog.records) == 1
+    assert "unreadable" in caplog.text
 
 
 def test_write_atomically_leaves_no_temporary_file_on_failure(
