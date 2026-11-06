@@ -34,7 +34,7 @@ def read_state(path: Path) -> tuple[Snapshot | None, str | None]:
 def parse_state_bytes(data: bytes, label: str = "state.json") -> tuple[Snapshot | None, str | None]:
     try:
         payload: Any = json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (ValueError, RecursionError):  # also an over-long integer, or nesting too deep
         return None, f"{label}: not valid JSON; exporting without a snapshot"
     if not isinstance(payload, dict):
         return None, f"{label}: not a JSON object; exporting without a snapshot"

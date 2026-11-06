@@ -92,11 +92,13 @@ class JournalFollower:
 
 @dataclass
 class StateFollower:
-    """Re-reads ``state.json``; keeps the previous snapshot while it is missing or invalid."""
+    """Re-reads ``state.json``; keeps the previous snapshot while it is missing, unreadable or
+    invalid. A lasting problem is warned about once, not on every poll."""
 
     path: Path
     raw: bytes | None = None
     snapshot: Snapshot | None = None
+    problem: str | None = None
 
     def poll(self) -> bool:
         try:
@@ -104,14 +106,23 @@ class StateFollower:
                 raw = handle.read()
         except FileNotFoundError:
             return False
+        except OSError as exc:
+            self._report(f"{self.path}: unreadable ({exc})")
+            return False
         if raw == self.raw:
+            self.problem = None
             return False
         snapshot, warning = parse_state_bytes(raw, str(self.path))
         if snapshot is None:
-            log.warning("%s; keeping the previous snapshot", warning)
+            self._report(warning)
             return False
-        self.raw, self.snapshot = raw, snapshot
+        self.raw, self.snapshot, self.problem = raw, snapshot, None
         return True
+
+    def _report(self, problem: str | None) -> None:
+        if problem != self.problem:
+            log.warning("%s; keeping the previous snapshot", problem)
+        self.problem = problem
 
 
 def write_atomically(run: InstanceRun, output: Path, options: ExportOptions, binary: bool) -> None:

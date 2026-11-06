@@ -80,7 +80,7 @@ def parse_line(raw: bytes, line_no: int, label: str = "journal") -> tuple[Event 
         return None, None
     try:
         payload: Any = json.loads(text)
-    except json.JSONDecodeError:
+    except (ValueError, RecursionError):  # also an over-long integer, or nesting too deep
         return None, f"{label} line {line_no}: skipping corrupted line: {text[:80]!r}"
     if not isinstance(payload, dict):
         return None, f"{label} line {line_no}: skipping non-object line: {text[:80]!r}"

@@ -69,7 +69,14 @@ def test_corrupt_non_object_and_blank_lines_are_skipped_with_warnings(
 
 @pytest.mark.parametrize(
     "raw",
-    [b"\xff\xfe not utf-8\n", b'{"type": 5}\n', b'{"content": "no type"}\n', b"null\n"],
+    [
+        b"\xff\xfe not utf-8\n",
+        b'{"type": 5}\n',
+        b'{"content": "no type"}\n',
+        b"null\n",
+        pytest.param(b"1" * 5000 + b"\n", id="over-long-integer"),
+        pytest.param(b"[" * 200_000 + b"\n", id="too-deeply-nested"),
+    ],
 )
 def test_malformed_lines_never_abort(raw: bytes) -> None:
     parsed = parse_journal_bytes(raw + _line("thought", "survivor"))
@@ -331,7 +338,17 @@ def test_state_without_seq_keeps_items() -> None:
     assert [i.seq for i in snapshot.short_term] == [None]
 
 
-@pytest.mark.parametrize("content", [b"", b"{corrupt", b"[1, 2]", b"\xff"])
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"",
+        b"{corrupt",
+        b"[1, 2]",
+        b"\xff",
+        pytest.param(b"1" * 5000, id="over-long-integer"),
+        pytest.param(b"[" * 200_000, id="too-deeply-nested"),
+    ],
+)
 def test_bad_state_yields_no_snapshot(tmp_path: Path, content: bytes) -> None:
     path = tmp_path / "state.json"
     path.write_bytes(content)
