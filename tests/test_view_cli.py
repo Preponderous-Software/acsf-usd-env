@@ -59,6 +59,29 @@ def test_view_refuses_a_non_stage_before_touching_strata(
     assert "no such file" in capsys.readouterr().err
 
 
+def test_view_refuses_png_with_watch_without_needing_strata(
+    view_stages: dict[str, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv(F.ENV_LIB, str(tmp_path / "nope.so"))
+    png = tmp_path / "x.png"
+    assert main(["view", str(view_stages["echo"]), "--png", str(png), "--watch"]) == 2
+    err = capsys.readouterr().err.strip().splitlines()
+    assert err == ["acsf-usd: error: --watch needs the window, not --png"]
+    assert not png.exists()
+
+
+def test_view_refuses_png_with_watch_before_reading_the_stage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv(F.ENV_LIB, str(tmp_path / "nope.so"))
+    missing = tmp_path / "missing.usda"
+    assert main(["view", str(missing), "--png", str(tmp_path / "x.png"), "--watch"]) == 2
+    assert "--watch needs the window" in capsys.readouterr().err
+
+
 def test_bad_size(view_stages: dict[str, Path]) -> None:
     with pytest.raises(SystemExit, match="WxH"):
         main(["view", str(view_stages["echo"]), "--size", "big"])

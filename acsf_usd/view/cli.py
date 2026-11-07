@@ -91,6 +91,9 @@ def run_view(args: argparse.Namespace) -> int:
     from acsf_usd.view.strata import Library, StrataError, StrataUnavailable
 
     size = parse_size(args.size)
+    if args.png is not None and args.watch:
+        print("acsf-usd: error: --watch needs the window, not --png", file=sys.stderr)
+        return 2
     try:
         run = load_run(args.stage)
     except StageError as exc:
@@ -106,9 +109,6 @@ def run_view(args: argparse.Namespace) -> int:
 
     try:
         if args.png is not None:
-            if args.watch:
-                print("acsf-usd: error: --watch needs the window, not --png", file=sys.stderr)
-                return 2
             for path in render_png(
                 lib,
                 run,
