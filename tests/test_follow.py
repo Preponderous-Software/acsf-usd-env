@@ -20,8 +20,9 @@ from pxr import Sdf, Usd
 from acsf_usd import follow as follow_module
 from acsf_usd.cli import main
 from acsf_usd.follow import JournalFollower, StateFollower, follow, write_atomically
+from acsf_usd.model import InstanceRun
 from acsf_usd.reader import read_instance, read_journal
-from acsf_usd.stage.build import ExportOptions
+from acsf_usd.stage.build import ExportOptions, build_instance_stage
 from tests.conftest import INSTANCES
 
 POLL = 0.05
@@ -162,6 +163,79 @@ def test_follow_in_process_stops_on_event(tmp_path: Path) -> None:
     assert main(["export", str(directory), "-o", str(batch)]) == 0
     assert output.read_bytes() == batch.read_bytes()
     assert {p.name: p.read_bytes() for p in directory.iterdir()} == before
+
+
+def _cycle(content: str, thought_count: int) -> bytes:
+    record = {"timestamp": "t", "type": "cycle", "content": content, "thought_count": thought_count}
+    return json.dumps(record).encode() + b"\n"
+
+
+def _start_follow(
+    directory: Path, output: Path, stop: threading.Event, writes: list[InstanceRun]
+) -> threading.Thread:
+    thread = threading.Thread(
+        target=follow,
+        args=(directory, output),
+        kwargs={"poll_interval": POLL, "stop": stop, "on_write": writes.append},
+    )
+    thread.start()
+    return thread
+
+
+def _no_snapshot_warnings(caplog: pytest.LogCaptureFixture) -> int:
+    return sum("no state.json snapshot" in r.getMessage() for r in caplog.records)
+
+
+def test_follow_reports_each_stage_building_warning_once(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # No state.json, and a journaled thought_count that does not advance: both are warned
+    # about while the stage is built, which follow mode does on every update.
+    writer = Writer(tmp_path / "Quill")
+    writer.append(_line("thought", "a") + _cycle("a", 5) + _line("thought", "b") + _cycle("b", 5))
+    stop = threading.Event()
+    writes: list[InstanceRun] = []
+    with caplog.at_level(logging.WARNING):
+        thread = _start_follow(writer.directory, tmp_path / "out" / "quill.usda", stop, writes)
+        try:
+            _wait(lambda: len(writes) >= 1)
+            writer.append(_line("thought", "c"))
+            _wait(lambda: len(writes) >= 2)
+            writer.append(_line("thought", "d"))
+            _wait(lambda: len(writes) >= 3)
+        finally:
+            stop.set()
+            thread.join(timeout=10)
+    assert not thread.is_alive()
+    assert len(writes) == 4  # initial, two updates, final
+    assert _no_snapshot_warnings(caplog) == 1
+    messages = [r.getMessage() for r in caplog.records]
+    assert messages.count("cycle thought_count 5 does not advance past cycle 5") == 1
+    writer.assert_untouched()
+
+
+def test_follow_leaves_other_threads_and_later_exports_warning_as_usual(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    writer = Writer(tmp_path / "Quill")
+    writer.append(_line("thought", "a"))
+    stop = threading.Event()
+    writes: list[InstanceRun] = []
+    with caplog.at_level(logging.WARNING):
+        thread = _start_follow(writer.directory, tmp_path / "quill.usda", stop, writes)
+        try:
+            _wait(lambda: len(writes) >= 1)
+            # Building a stage on another thread while follow runs still warns. (Not via
+            # main(), which stops the acsf_usd loggers propagating to caplog.)
+            build_instance_stage(read_instance(writer.directory))
+        finally:
+            stop.set()
+            thread.join(timeout=10)
+        # So does building one after follow has returned.
+        build_instance_stage(read_instance(writer.directory))
+    assert not thread.is_alive()
+    assert len(writes) == 2  # initial and final; the final one does not repeat the warning
+    assert _no_snapshot_warnings(caplog) == 3
 
 
 # --- JournalFollower / StateFollower --------------------------------------------------------
