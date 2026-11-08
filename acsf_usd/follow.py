@@ -7,6 +7,8 @@ are consumed (a partial trailing line waits for the next poll), and a file that 
 re-read from offset 0. New events go through the same indexer as a batch export; the instance
 layer is re-authored from the run model and written to a temporary file next to the output,
 then moved over it with ``os.replace``, so a USD tool never sees a half-written file.
+Warnings raised while the stage is rebuilt (no snapshot, a non-advancing cycle) are reported
+once per session, not on every update.
 
 Strictly read-only against the instance directory: files there are only opened for reading;
 no lock, sidecar, offset or temporary file is created in it. On SIGINT/SIGTERM a final write
@@ -38,6 +40,10 @@ from acsf_usd.stage.build import ExportOptions, build_instance_stage, write_stag
 log = logging.getLogger(__name__)
 
 DEFAULT_POLL_INTERVAL = 0.5
+
+# Loggers of the code shared with batch export that warns while a stage is built. Follow mode
+# rebuilds the stage on every update, so their warnings are reported once per session.
+REBUILD_LOGGERS = ("acsf_usd.stage.build", "acsf_usd.reader.cycles")
 
 
 @dataclass
@@ -125,6 +131,25 @@ class StateFollower:
         self.problem = problem
 
 
+class _OncePerThread(logging.Filter):
+    """Drops a record from ``thread`` whose message that thread already logged; records from
+    other threads (e.g. a concurrent batch export) pass unchanged."""
+
+    def __init__(self, thread: int) -> None:
+        super().__init__()
+        self.thread = thread
+        self.seen: set[str] = set()
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.thread != self.thread:
+            return True
+        message = record.getMessage()
+        if message in self.seen:
+            return False
+        self.seen.add(message)
+        return True
+
+
 def write_atomically(run: InstanceRun, output: Path, options: ExportOptions, binary: bool) -> None:
     """Author the instance layer to a temporary file next to ``output``, then replace it.
 
@@ -174,6 +199,9 @@ def follow(
     state = StateFollower(directory / STATE)
     name = directory.resolve().name
     restore = _install_signal_handlers(stop)
+    once = _OncePerThread(threading.get_ident())
+    for logger in REBUILD_LOGGERS:
+        logging.getLogger(logger).addFilter(once)
     try:
         first = True
         while True:
@@ -196,6 +224,8 @@ def follow(
                 return run
             stop.wait(poll_interval)
     finally:
+        for logger in REBUILD_LOGGERS:
+            logging.getLogger(logger).removeFilter(once)
         restore()
 
 
