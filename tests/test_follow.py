@@ -22,7 +22,7 @@ from acsf_usd.cli import main
 from acsf_usd.follow import JournalFollower, StateFollower, follow, write_atomically
 from acsf_usd.model import InstanceRun
 from acsf_usd.reader import read_instance, read_journal
-from acsf_usd.stage.build import ExportOptions
+from acsf_usd.stage.build import ExportOptions, build_instance_stage
 from tests.conftest import INSTANCES
 
 POLL = 0.05
@@ -225,13 +225,14 @@ def test_follow_leaves_other_threads_and_later_exports_warning_as_usual(
         thread = _start_follow(writer.directory, tmp_path / "quill.usda", stop, writes)
         try:
             _wait(lambda: len(writes) >= 1)
-            # A batch export on another thread while follow runs still warns.
-            assert main(["export", str(writer.directory), "-o", str(tmp_path / "a.usda")]) == 0
+            # Building a stage on another thread while follow runs still warns. (Not via
+            # main(), which stops the acsf_usd loggers propagating to caplog.)
+            build_instance_stage(read_instance(writer.directory))
         finally:
             stop.set()
             thread.join(timeout=10)
-        # So does one after follow has returned.
-        assert main(["export", str(writer.directory), "-o", str(tmp_path / "b.usda")]) == 0
+        # So does building one after follow has returned.
+        build_instance_stage(read_instance(writer.directory))
     assert not thread.is_alive()
     assert len(writes) == 2  # initial and final; the final one does not repeat the warning
     assert _no_snapshot_warnings(caplog) == 3
