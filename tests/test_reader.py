@@ -137,6 +137,32 @@ def test_cycle_event_without_integer_thought_count_warns_and_is_not_authoritativ
     assert index_events(parsed.events).indexing == "counted"
 
 
+# An integer JSON accepts but no float can hold: float() raises OverflowError on it.
+HUGE = 10**400
+
+
+def test_cycle_event_drops_integers_too_large_for_a_float() -> None:
+    parsed = parse_journal_bytes(
+        _line(
+            "cycle",
+            "x",
+            thought_count=1,
+            mood={"calm": 0.5, "joy": HUGE, "fear": -HUGE},
+            prediction={"error": HUGE},
+            reflection={"effective": -HUGE, "fired": True},
+            attention={"focus": "thought", "salience": HUGE},
+        )
+    )
+    (event,) = parsed.events
+    assert parsed.warnings == ()
+    assert event.cycle is not None
+    assert event.cycle.mood == {"calm": 0.5}
+    assert event.cycle.prediction_error is None
+    assert event.cycle.reflection_effective is None
+    assert event.cycle.reflection_fired is True
+    assert event.cycle.attention_salience is None
+
+
 def test_non_string_content_is_serialised_deterministically() -> None:
     (event,) = _events(_line("custom", content={"b": 1, "a": 2}))  # type: ignore[arg-type]
     assert event.content == '{"a": 2, "b": 1}'
@@ -469,6 +495,41 @@ def test_state_short_term_keeps_object_items_and_defaults_their_fields() -> None
         WorkspaceItem(kind="thought", content="", timestamp="", importance=0.0, seq=None),
         WorkspaceItem(kind="perception", content="", timestamp="", importance=3.0, seq=5),
     )
+
+
+def test_state_drops_integers_too_large_for_a_float() -> None:
+    snapshot = _snapshot(
+        {
+            "identity": {
+                "mood": {"curiosity": 0.5, "wonder": HUGE},
+                "initial_mood": {"curiosity": -HUGE, "wonder": 0.25},
+                "attention_schema": {"theme": "tides", "salience": HUGE},
+            },
+            "short_term": [{"kind": "thought", "importance": HUGE, "seq": 1}],
+        }
+    )
+    assert snapshot.mood == {"curiosity": 0.5}
+    assert snapshot.initial_mood == {"wonder": 0.25}
+    assert snapshot.attention_theme == "tides"
+    assert snapshot.attention_salience is None
+    assert snapshot.short_term == (
+        WorkspaceItem(kind="thought", content="", timestamp="", importance=0.0, seq=1),
+    )
+
+
+def test_read_instance_survives_integers_too_large_for_a_float(tmp_path: Path) -> None:
+    directory = tmp_path / "Vast"
+    directory.mkdir()
+    (directory / "journal.jsonl").write_bytes(
+        _line("thought", "a") + _line("cycle", "x", thought_count=1, mood={"joy": HUGE})
+    )
+    (directory / "state.json").write_text(
+        json.dumps({"identity": {"name": "Vast", "mood": {"joy": HUGE}}, "thought_count": 1})
+    )
+    run = read_instance(directory)
+    assert run.snapshot is not None and run.snapshot.mood == {}
+    traces = [i.event.cycle for i in run.journal.events if i.event.cycle is not None]
+    assert [trace.mood for trace in traces] == [{}]
 
 
 def test_state_short_term_that_is_not_a_list_is_empty() -> None:
