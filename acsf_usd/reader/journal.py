@@ -124,7 +124,10 @@ def _int(value: Any) -> int | None:
 def _float(value: Any) -> float | None:
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
-    result = float(value)
+    try:
+        result = float(value)
+    except OverflowError:  # an integer JSON accepts but no float can hold
+        return None
     return result if math.isfinite(result) else None
 
 
