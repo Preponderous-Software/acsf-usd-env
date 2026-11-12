@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from acsf_usd.model import CycleTrace, Event
+from acsf_usd.model import INT32_MAX, INT32_MIN, CycleTrace, Event
 
 log = logging.getLogger(__name__)
 
@@ -121,6 +121,12 @@ def _int(value: Any) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
+def _int32(value: Any) -> int | None:
+    """An integer that fits the stage's 32-bit ``int`` attributes, else ``None``."""
+    number = _int(value)
+    return number if number is not None and INT32_MIN <= number <= INT32_MAX else None
+
+
 def _float(value: Any) -> float | None:
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
@@ -161,7 +167,7 @@ def _cycle_trace(extras: Mapping[str, Any], retrieved: Any) -> CycleTrace | None
         prediction_error=_float(prediction.get("error")),
         reflection_effective=_float(reflection.get("effective")),
         reflection_fired=fired if isinstance(fired, bool) else None,
-        short_term_size=_int(extras.get("short_term_size")),
+        short_term_size=_int32(extras.get("short_term_size")),
         retrieved_count=len(retrieved) if isinstance(retrieved, list) else None,
         attention_focus=_str(attention.get("focus")),
         attention_theme=_str(attention.get("theme")),

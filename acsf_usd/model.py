@@ -13,6 +13,10 @@ from typing import Any, Literal
 
 CycleIndexing = Literal["journaled", "counted"]
 
+# The range of the stage's ``int`` attributes (``Sdf.ValueTypeNames.Int`` is 32-bit).
+INT32_MIN = -(2**31)
+INT32_MAX = 2**31 - 1
+
 
 @dataclass(frozen=True)
 class CycleTrace:
