@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 
 from pxr import Sdf, Usd, UsdGeom
 
-from acsf_usd.model import CycleTrace, IndexedEvent, IndexedJournal
+from acsf_usd.model import INT32_MAX, INT32_MIN, CycleTrace, IndexedEvent, IndexedJournal
 from acsf_usd.stage.common import unique_names
 
 T = Sdf.ValueTypeNames
@@ -103,7 +103,9 @@ def collect(events: Sequence[IndexedEvent]) -> dict[int, CycleData]:
             total = _int(event.extras.get("long_term_total"))
             if total is not None:
                 data.long_term_count = total
-            data.consolidation_stored += _int(event.extras.get("stored")) or 0
+            stored = data.consolidation_stored + (_int(event.extras.get("stored")) or 0)
+            if INT32_MIN <= stored <= INT32_MAX:
+                data.consolidation_stored = stored
         elif kind == "utterance":
             to = event.extras.get("to")
             sender = to if isinstance(to, str) and to else UNKNOWN_SENDER
@@ -117,7 +119,10 @@ def collect(events: Sequence[IndexedEvent]) -> dict[int, CycleData]:
 
 
 def _int(value: object) -> int | None:
-    return value if isinstance(value, int) and not isinstance(value, bool) else None
+    """An integer that fits the 32-bit ``int`` attributes it is written to, else ``None``."""
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value if INT32_MIN <= value <= INT32_MAX else None
+    return None
 
 
 def sender_prim_names(senders: Iterable[str]) -> dict[str, str]:
