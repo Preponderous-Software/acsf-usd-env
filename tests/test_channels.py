@@ -334,3 +334,40 @@ def test_export_missing_input_exits_1(
 def test_export_records_source_commit(tmp_path: Path) -> None:
     stage = _export(INSTANCES / "Nova", tmp_path, source_commit="64486d9")
     assert stage.GetRootLayer().customLayerData["acsf:sourceCommit"] == "64486d9"
+
+
+INT_MAX = 2**31 - 1
+
+
+def _int_channel_journal(directory: Path) -> None:
+    directory.mkdir()
+    lines: list[dict[str, object]] = [
+        {"type": "thought", "content": "one"},
+        {"type": "cycle", "thought_count": 1, "short_term_size": INT_MAX + 1},
+        {"type": "memory", "content": "m", "long_term_count": INT_MAX + 1},
+        {"type": "consolidation", "content": "c", "stored": INT_MAX + 1},
+        {"type": "thought", "content": "two"},
+        {"type": "cycle", "thought_count": 2, "short_term_size": INT_MAX},
+        {"type": "memory", "content": "m", "long_term_count": -(INT_MAX + 2)},
+        {"type": "consolidation", "content": "c", "stored": INT_MAX, "long_term_total": 7},
+        {"type": "consolidation", "content": "c", "stored": 1},
+    ]
+    (directory / "journal.jsonl").write_text("".join(json.dumps(x) + "\n" for x in lines))
+
+
+def test_integers_outside_the_int_attribute_range_are_dropped(tmp_path: Path) -> None:
+    _int_channel_journal(tmp_path / "Big")
+    stage = _export(tmp_path / "Big", tmp_path)
+    big = "/World/Instances/Big"
+    assert _samples(stage, f"{big}/Cycle", "acsf:workspaceSize") == {2.0: INT_MAX}
+    assert _samples(stage, f"{big}/Memory", "acsf:longTermCount") == {2.0: 7}
+    # A count that would carry the cycle's total past the range is dropped, like one that is
+    # out of range itself.
+    assert _samples(stage, f"{big}/Memory", "acsf:consolidationStored") == {1.0: 0, 2.0: INT_MAX}
+
+
+def test_export_succeeds_with_integers_outside_the_int_attribute_range(tmp_path: Path) -> None:
+    _int_channel_journal(tmp_path / "Big")
+    out = tmp_path / "big.usda"
+    assert main(["export", str(tmp_path / "Big"), "-o", str(out)]) == 0
+    assert main(["validate", str(out), str(tmp_path / "Big")]) == 0
