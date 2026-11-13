@@ -110,12 +110,12 @@ metrics already use.
    before #196) is numbered one past the previous cycle.
    A `cycle` event also bounds its cycle on its own, so a corrupt (skipped) `thought` line
    never merges two journaled cycles.
-   A `thought_count` more than 100,000 cycles past the previous cycle is treated as corrupt
-   and numbered one past the previous cycle instead, with a warning: failed cycles leave
-   gaps, but trusting a value that far out would fill a timeline of that length. The first
-   cycle has no previous one, so it is numbered 1 when its `thought_count` is more than
-   100,000 past the next journaled cycle's. A `thought_count` that does not advance is kept,
-   with a warning.
+   A `thought_count` more than 100,000 cycles past or behind the previous cycle is treated
+   as corrupt and numbered one past the previous cycle instead, with a warning: failed cycles
+   leave gaps, but trusting a value that far out would fill a timeline of that length. The
+   first cycle has no previous one, so it is numbered 1 when its `thought_count` is more than
+   100,000 past the next journaled cycle's. A `thought_count` that repeats, or goes back by no
+   more than that, is kept with a warning.
 2. Journals without `cycle` events (written before #196 — e.g. the committed golden runs,
    which contain only `thought`, `perception` and `reflection`) fall back to counting
    `thought` events: a `perception` belongs to the next `thought`; everything after a
