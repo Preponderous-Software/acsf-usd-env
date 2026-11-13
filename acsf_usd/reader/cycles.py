@@ -19,6 +19,10 @@ trace once the current group already has one (so a corrupt, skipped ``thought`` 
 merges two journaled cycles); any other event joins the current group.
 In a journal that has ``cycle`` events, a group without one (for example a stretch written
 before ACSF #196) is numbered one past the previous group.
+A journaled ``thought_count`` more than ``MAX_CYCLE_JUMP`` cycles past the previous group is
+untrustworthy and is numbered one past it instead; the first group, which has no previous one,
+is numbered 1 when its ``thought_count`` is that far past the next journaled one. Both are
+warned. A ``thought_count`` that does not advance is kept, with a warning.
 """
 
 from __future__ import annotations
@@ -32,6 +36,11 @@ from acsf_usd.model import CycleIndexing, Event, IndexedEvent, IndexedJournal
 log = logging.getLogger(__name__)
 
 _GROUP_STARTERS = frozenset({"perception", "thought"})
+
+# The largest forward jump between consecutive journaled cycles that is trusted. Failed cycles
+# leave gaps, but one far larger than this is a corrupt value, and trusting it would make the
+# exporter fill a timeline of that length.
+MAX_CYCLE_JUMP = 100_000
 
 
 @dataclass
@@ -94,10 +103,30 @@ def index_events(events: Sequence[Event]) -> IndexedJournal:
 def _number_groups(groups: list[_Group], indexing: CycleIndexing) -> list[int]:
     numbers: list[int] = []
     previous = 0
+    journaled = [g.journaled for g in groups if g.journaled is not None]
     for group in groups:
         if indexing == "journaled" and group.journaled is not None:
             number = group.journaled
-            if number <= previous and numbers:
+            if numbers and number > previous + MAX_CYCLE_JUMP:
+                log.warning(
+                    "cycle thought_count %d jumps more than %d cycles past cycle %d; "
+                    "numbered %d instead",
+                    number,
+                    MAX_CYCLE_JUMP,
+                    previous,
+                    previous + 1,
+                )
+                number = previous + 1
+            elif not numbers and len(journaled) > 1 and number > journaled[1] + MAX_CYCLE_JUMP:
+                log.warning(
+                    "first cycle thought_count %d is more than %d cycles past the next "
+                    "journaled cycle %d; numbered 1 instead",
+                    number,
+                    MAX_CYCLE_JUMP,
+                    journaled[1],
+                )
+                number = 1
+            elif number <= previous and numbers:
                 log.warning(
                     "cycle thought_count %d does not advance past cycle %d", number, previous
                 )
