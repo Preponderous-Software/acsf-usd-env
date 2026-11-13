@@ -317,6 +317,17 @@ def test_journaled_thought_count_far_past_the_previous_cycle_is_numbered_after_i
     assert "2000000000" in messages[0]
 
 
+def test_journaled_thought_count_far_behind_the_previous_cycle_is_numbered_after_it(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # A far backward value would stretch the timeline just as far, from below.
+    with caplog.at_level(logging.WARNING, logger="acsf_usd.reader.cycles"):
+        assert _thought_cycles(_journaled(1, 2, -2_000_000_000, 4)) == [1, 2, 3, 4]
+    messages = [r.getMessage() for r in caplog.records]
+    assert len(messages) == 1
+    assert "-2000000000" in messages[0]
+
+
 def test_first_journaled_thought_count_far_past_the_next_one_is_numbered_from_one(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
