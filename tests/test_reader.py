@@ -137,7 +137,9 @@ def test_cycle_event_without_integer_thought_count_warns_and_is_not_authoritativ
     assert index_events(parsed.events).indexing == "counted"
 
 
-@pytest.mark.parametrize("thought_count", [10**400, 2**31, -(2**31) - 1])
+@pytest.mark.parametrize(
+    "thought_count", [10**400, 2**31, -(2**31) - 1], ids=["10**400", "int32+1", "int32-1"]
+)
 def test_cycle_event_with_thought_count_outside_32_bits_is_not_authoritative(
     thought_count: int,
 ) -> None:
