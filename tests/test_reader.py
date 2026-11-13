@@ -294,6 +294,49 @@ def test_journaled_thought_count_that_does_not_advance_is_kept_with_a_warning(
     ]
 
 
+def _journaled(*counts: int) -> tuple[Event, ...]:
+    lines: list[bytes] = []
+    for n, count in enumerate(counts):
+        lines.append(_line("thought", f"t{n}"))
+        lines.append(_line("cycle", f"c{n}", thought_count=count))
+    return _events(*lines)
+
+
+def _thought_cycles(events: tuple[Event, ...]) -> list[int]:
+    return [i.cycle for i in index_events(events).events if i.event.type == "thought"]
+
+
+def test_journaled_thought_count_far_past_the_previous_cycle_is_numbered_after_it(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # One corrupted thought_count must not stretch the timeline to two billion cycles.
+    with caplog.at_level(logging.WARNING, logger="acsf_usd.reader.cycles"):
+        assert _thought_cycles(_journaled(1, 2_000_000_000, 3)) == [1, 2, 3]
+    messages = [r.getMessage() for r in caplog.records]
+    assert len(messages) == 1
+    assert "2000000000" in messages[0]
+
+
+def test_first_journaled_thought_count_far_past_the_next_one_is_numbered_from_one(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="acsf_usd.reader.cycles"):
+        assert _thought_cycles(_journaled(2_000_000_000, 2, 3)) == [1, 2, 3]
+    messages = [r.getMessage() for r in caplog.records]
+    assert len(messages) == 1
+    assert "2000000000" in messages[0]
+
+
+def test_large_but_consistent_journaled_thought_counts_are_kept(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # A journal that starts late, or a long run of failed cycles, is not a corrupt value.
+    with caplog.at_level(logging.WARNING, logger="acsf_usd.reader.cycles"):
+        assert _thought_cycles(_journaled(50_000, 50_001, 60_000)) == [50_000, 50_001, 60_000]
+        assert _thought_cycles(_journaled(2_000_000_000)) == [2_000_000_000]
+    assert caplog.records == []
+
+
 def test_first_journaled_cycle_is_never_warned_about(caplog: pytest.LogCaptureFixture) -> None:
     events = _events(_line("thought", "a"), _line("cycle", "a", thought_count=0))
     with caplog.at_level(logging.WARNING, logger="acsf_usd.reader.cycles"):
