@@ -137,6 +137,19 @@ def test_cycle_event_without_integer_thought_count_warns_and_is_not_authoritativ
     assert index_events(parsed.events).indexing == "counted"
 
 
+@pytest.mark.parametrize("thought_count", [10**400, 2**31, -(2**31) - 1])
+def test_cycle_event_with_thought_count_outside_32_bits_is_not_authoritative(
+    thought_count: int,
+) -> None:
+    # 10**400 is valid JSON but no USD time code can hold it.
+    parsed = parse_journal_bytes(
+        _line("thought", "a") + _line("cycle", "x", thought_count=thought_count)
+    )
+    assert parsed.events[1].cycle is None
+    assert "thought_count" in parsed.warnings[0]
+    assert [i.cycle for i in index_events(parsed.events).events] == [1, 1]
+
+
 # An integer JSON accepts but no float can hold: float() raises OverflowError on it.
 HUGE = 10**400
 
