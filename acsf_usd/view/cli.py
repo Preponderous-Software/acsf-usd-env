@@ -39,7 +39,9 @@ def add_parsers(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -
         metavar="N",
         help="cycle to show (default: the last); repeat with --png for several images",
     )
-    view.add_argument("--size", default="1280x720", metavar="WxH", help="default 1280x720")
+    view.add_argument(
+        "--size", type=parse_size, default="1280x720", metavar="WxH", help="default 1280x720"
+    )
     view.add_argument("--instance", metavar="NAME", help="instance whose text is shown first")
     view.add_argument(
         "--panel", choices=PANELS, default="thought", help="text shown in the bottom panel"
@@ -63,12 +65,13 @@ def add_parsers(commands: argparse._SubParsersAction[argparse.ArgumentParser]) -
 
 
 def parse_size(text: str) -> tuple[int, int]:
+    """The ``--size`` type: a bad value is a usage error (argparse exits 2 with the usage)."""
     try:
         w, h = (int(v) for v in text.lower().split("x"))
     except ValueError:
-        raise SystemExit(f"acsf-usd: error: --size must be WxH, not {text!r}") from None
+        raise argparse.ArgumentTypeError(f"must be WxH, not {text!r}") from None
     if not (16 <= w <= 8192 and 16 <= h <= 8192):
-        raise SystemExit("acsf-usd: error: --size must be between 16 and 8192 on each side")
+        raise argparse.ArgumentTypeError("must be between 16 and 8192 on each side")
     return w, h
 
 
@@ -90,7 +93,7 @@ def run_view(args: argparse.Namespace) -> int:
     from acsf_usd.view.model import StageError, load_run
     from acsf_usd.view.strata import Library, StrataError, StrataUnavailable
 
-    size = parse_size(args.size)
+    size: tuple[int, int] = args.size
     if args.png is not None and args.watch:
         print("acsf-usd: error: --watch needs the window, not --png", file=sys.stderr)
         return 2
