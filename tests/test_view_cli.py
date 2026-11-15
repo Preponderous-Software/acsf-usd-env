@@ -82,11 +82,28 @@ def test_view_refuses_png_with_watch_before_reading_the_stage(
     assert "--watch needs the window" in capsys.readouterr().err
 
 
-def test_bad_size(view_stages: dict[str, Path]) -> None:
-    with pytest.raises(SystemExit, match="WxH"):
-        main(["view", str(view_stages["echo"]), "--size", "big"])
-    with pytest.raises(SystemExit, match="between 16 and 8192"):
-        main(["view", str(view_stages["echo"]), "--size", "4x4"])
+@pytest.mark.parametrize(
+    ("size", "message"),
+    [
+        ("big", "argument --size: must be WxH, not 'big'"),
+        ("4x4", "argument --size: must be between 16 and 8192 on each side"),
+    ],
+)
+def test_bad_size_is_a_usage_error(
+    size: str,
+    message: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv(F.ENV_LIB, str(tmp_path / "nope.so"))
+    missing = tmp_path / "missing.usda"  # rejected before the stage is read
+    with pytest.raises(SystemExit) as excinfo:
+        main(["view", str(missing), "--size", size])
+    assert excinfo.value.code == 2
+    err = capsys.readouterr().err
+    assert err.startswith("usage: acsf-usd view")
+    assert f"acsf-usd view: error: {message}" in err
 
 
 def test_fetch_strata_reports_errors(
