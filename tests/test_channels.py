@@ -371,3 +371,22 @@ def test_export_succeeds_with_integers_outside_the_int_attribute_range(tmp_path:
     out = tmp_path / "big.usda"
     assert main(["export", str(tmp_path / "Big"), "-o", str(out)]) == 0
     assert main(["validate", str(out), str(tmp_path / "Big")]) == 0
+
+
+def test_a_corrupt_thought_count_does_not_stretch_the_timeline(tmp_path: Path) -> None:
+    # Without the jump bound this export would fill two billion cycles and never finish, so
+    # it is guarded end to end in addition to the indexer tests.
+    directory = tmp_path / "Jump"
+    directory.mkdir()
+    lines: list[dict[str, object]] = [
+        {"type": "thought", "content": "one"},
+        {"type": "cycle", "thought_count": 1},
+        {"type": "thought", "content": "two"},
+        {"type": "cycle", "thought_count": 2_000_000_000},
+    ]
+    (directory / "journal.jsonl").write_text("".join(json.dumps(x) + "\n" for x in lines))
+    stage = _export(directory, tmp_path)
+    assert (stage.GetStartTimeCode(), stage.GetEndTimeCode()) == (1, 2)
+    out = tmp_path / "jump.usda"
+    assert main(["export", str(directory), "-o", str(out)]) == 0
+    assert main(["validate", str(out), str(directory)]) == 0

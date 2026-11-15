@@ -97,7 +97,9 @@ def parse_line(raw: bytes, line_no: int, label: str = "journal") -> tuple[Event 
         retrieved = extras.pop("retrieved", None)
         trace = _cycle_trace(extras, retrieved)
         if trace is None:
-            warning = f"{label} line {line_no}: 'cycle' event without an integer thought_count"
+            warning = (
+                f"{label} line {line_no}: 'cycle' event without a 32-bit integer thought_count"
+            )
     return (
         Event(
             line_no=line_no,
@@ -146,7 +148,8 @@ def _mapping(value: Any) -> Mapping[str, Any]:
 
 
 def _cycle_trace(extras: Mapping[str, Any], retrieved: Any) -> CycleTrace | None:
-    thought_count = _int(extras.get("thought_count"))
+    # A cycle number becomes a USD time code; one outside 32 bits is a corrupt value.
+    thought_count = _int32(extras.get("thought_count"))
     if thought_count is None:
         return None
     prediction = _mapping(extras.get("prediction"))
