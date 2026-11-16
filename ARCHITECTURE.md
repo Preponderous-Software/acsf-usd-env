@@ -71,7 +71,8 @@ ACSF maintainers to accept or reject; nothing is filed or changed in ACSF by thi
 acsf_usd/
   reader/       ACSF artifact readers (journal.jsonl, state.json), typed records, cycle indexer,
                 input resolution
-  model.py      In-memory run model: Instance, Cycle, Event, Snapshot
+  model.py      In-memory run model: InstanceRun, IndexedJournal, IndexedEvent, Event,
+                CycleTrace, Snapshot, WorkspaceItem
   stage/        USD writers: static snapshot, time-sampled channels, schematic layout, composition
   follow.py     `--follow`: poll journal.jsonl from a byte offset, re-author the instance layer
   validate.py   `acsf-usd validate`: re-read a stage and check it against its source journal
