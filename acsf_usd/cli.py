@@ -6,6 +6,7 @@ import argparse
 import logging
 import math
 import sys
+import threading
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -90,7 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     export.add_argument(
         "--poll-interval",
-        type=_positive_float,
+        type=_poll_interval,
         default=DEFAULT_POLL_INTERVAL,
         metavar="S",
         help=f"seconds between journal polls with --follow (default: {DEFAULT_POLL_INTERVAL})",
@@ -131,6 +132,14 @@ def _positive_float(text: str) -> float:
         raise argparse.ArgumentTypeError(f"not a number: {text!r}") from None
     if not (math.isfinite(value) and value > 0):
         raise argparse.ArgumentTypeError("must be a finite number greater than 0")
+    return value
+
+
+def _poll_interval(text: str) -> float:
+    # follow() waits with threading.Event.wait, which raises OverflowError above TIMEOUT_MAX.
+    value = _positive_float(text)
+    if value > threading.TIMEOUT_MAX:
+        raise argparse.ArgumentTypeError(f"must be at most {threading.TIMEOUT_MAX:g} seconds")
     return value
 
 
