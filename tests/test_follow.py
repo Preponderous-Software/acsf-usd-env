@@ -427,3 +427,22 @@ def test_poll_interval_must_be_positive_and_finite(value: str, tmp_path: Path) -
     with pytest.raises(SystemExit) as excinfo:
         main(["export", str(INSTANCES / "Nova"), "--follow", "--poll-interval", value])
     assert excinfo.value.code == 2
+
+
+@pytest.mark.parametrize("value", ["1e10", repr(threading.TIMEOUT_MAX * 2)])
+def test_poll_interval_longer_than_a_wait_can_take_is_a_usage_error(
+    value: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # threading.Event.wait refuses a timeout above TIMEOUT_MAX with OverflowError, so such a
+    # value must be rejected while parsing, before anything is written.
+    monkeypatch.chdir(tmp_path)
+    output = tmp_path / "nova.usda"
+    args = ["export", str(INSTANCES / "Nova"), "-o", str(output), "--follow"]
+    with pytest.raises(SystemExit) as excinfo:
+        main([*args, "--poll-interval", value])
+    assert excinfo.value.code == 2
+    assert "argument --poll-interval" in capsys.readouterr().err
+    assert list(tmp_path.iterdir()) == []
